@@ -3,6 +3,7 @@ import { getClient } from '../auth/auth.js';
 import { orderArtists, pickArtist, buildInitialTracks } from '../core/prep.js';
 import { playlistTitle } from '../core/naming.js';
 import { createPrepDraft } from '../data/playlists.js';
+import { setArtistItunesId } from '../data/lives.js';
 
 export const CONTEXT_KEY = 'liveapp.prepContext';
 const MESSAGES = {
@@ -14,6 +15,9 @@ export const NOT_FOUND = 'iTunes で見つかりませんでした。名前を�
 
 export function saveContext(c) {
   try { sessionStorage.setItem(CONTEXT_KEY, JSON.stringify(c)); } catch { /* 保存できなくても進める */ }
+}
+export function clearContext() {
+  try { sessionStorage.removeItem(CONTEXT_KEY); } catch { /* 消せなくても進める */ }
 }
 export function loadContext() {
   try {
@@ -51,9 +55,12 @@ export async function createFor(c, itunesArtistId) {
   const { tracks, rest } = buildInitialTracks({ popular: cands.popular ?? [], recent: cands.recent ?? [] }, c.name);
   const title = playlistTitle({ kind: 'prep', artistName: c.name, date: c.date, venue: c.venue });
   try {
-    return await createPrepDraft({
+    const id = await createPrepDraft({
       liveId: c.liveId, liveArtistId: c.liveArtistId, artistName: c.name, itunesArtistId, tracks, rest, title,
     });
+    clearContext();
+    if (c.liveArtistId) await setArtistItunesId(c.liveArtistId, itunesArtistId).catch(() => {}); // 覚えられなくても作れている
+    return id;
   } catch {
     throw new Error('保存できませんでした。通信を確かめてください');
   }
