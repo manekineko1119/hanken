@@ -1,9 +1,13 @@
 begin;
-select plan(11);
+select plan(12);
 
 insert into public.allowed_emails (email) values ('a@example.test');
 
--- ---------- フックの中身（postgres で呼ぶ。テスト用の接続は supabase_auth_admin に set role できないため）----------
+-- ---------- フックの中身（postgres で呼ぶ）
+-- 既知の限界：テスト用の接続（postgres）は supabase_auth_admin に set role できない
+-- （grant も "role memberships are reserved" で不可）。postgres は RLS を素通りするので、
+-- ここでは allowed_emails_auth_admin_select ポリシーそのものは動かない。
+-- 代わりに下で pg_policies を見て、ポリシーの存在・対象ロール・SELECT・using(true) を確かめる。----------
 
 select is(
   public.hook_before_user_created(jsonb_build_object('user', jsonb_build_object('email', 'stranger@example.test'))) -> 'error' ->> 'http_code',
@@ -27,6 +31,13 @@ select is(
 -- ---------- 権限（Auth が使う supabase_auth_admin だけが実行できる）----------
 select ok(has_function_privilege('supabase_auth_admin', 'public.hook_before_user_created(jsonb)', 'execute'), 'supabase_auth_admin は hook を実行できる');
 select ok(not has_function_privilege('authenticated', 'public.hook_before_user_created(jsonb)', 'execute'), 'authenticated に execute 権限がない');
+select ok(
+  exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'allowed_emails'
+      and policyname = 'allowed_emails_auth_admin_select'
+      and cmd = 'SELECT' and roles = array['supabase_auth_admin']::name[] and qual = 'true'
+  ), 'allowed_emails に supabase_auth_admin 向けの SELECT using(true) ポリシーがある');
 select ok(has_table_privilege('supabase_auth_admin', 'public.allowed_emails', 'select'), 'supabase_auth_admin は allowed_emails を select できる');
 
 
