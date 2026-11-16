@@ -433,3 +433,9 @@ client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 # DO NOT commit the secret. It is read from supabase/.env.
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 skip_nonce_check = false
+
+[functions.artist-search]
+verify_jwt = true
+
+[functions.track-candidates]
+verify_jwt = true
