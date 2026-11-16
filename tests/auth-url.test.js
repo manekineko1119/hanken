@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readAuthReturn, pickReturnTo, classifyAuth } from '../src/core/auth-url.js';
+import { readAuthReturn, pickReturnTo, classifyAuth, resolveAllowed } from '../src/core/auth-url.js';
 
 test('拒否された戻り：denied が true で、クエリとハッシュの error が消える', () => {
   const r = readAuthReturn(
@@ -80,4 +80,22 @@ test('classifyAuth：タイムアウト は unknown', () => {
 });
 test('classifyAuth：code なしのエラー は unknown', () => {
   assert.equal(classifyAuth({ session: null, error: new Error('x') }), 'unknown');
+});
+
+test('resolveAllowed：signedIn 以外はそのまま（denied は false）', () => {
+  for (const state of ['signedOut', 'unknown']) {
+    assert.deepEqual(resolveAllowed({ state, allowed: false, allowedError: null }), { state, denied: false });
+  }
+});
+
+test('resolveAllowed：許可されていれば signedIn のまま', () => {
+  assert.deepEqual(resolveAllowed({ state: 'signedIn', allowed: true, allowedError: null }), { state: 'signedIn', denied: false });
+});
+
+test('resolveAllowed：許可リストから外されていれば signedOut と denied', () => {
+  assert.deepEqual(resolveAllowed({ state: 'signedIn', allowed: false, allowedError: null }), { state: 'signedOut', denied: true });
+});
+
+test('resolveAllowed：確認の通信に失敗したら unknown（拒否扱いにしない）', () => {
+  assert.deepEqual(resolveAllowed({ state: 'signedIn', allowed: null, allowedError: new Error('net') }), { state: 'unknown', denied: false });
 });

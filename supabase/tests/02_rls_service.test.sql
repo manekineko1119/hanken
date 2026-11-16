@@ -1,5 +1,5 @@
 begin;
-select plan(15);
+select plan(18);
 
 -- ---------- 準備（postgres）----------
 insert into auth.users (id, email) values
@@ -48,6 +48,8 @@ select is(
   array['connected','channel_title','connected_at'],
   'youtube_connection_status の列は connected / channel_title / connected_at だけ（鍵の列は返さない）');
 
+select is(public.am_i_allowed(), true, '許可済みの A は am_i_allowed() が true');
+
 -- ---------- 許可リストから外すと connected=false（修正3）----------
 reset role;
 delete from public.allowed_emails where email = 'a@example.test';
@@ -58,12 +60,14 @@ select results_eq(
   $$select connected, channel_title, connected_at from public.youtube_connection_status()$$,
   $$values (false, null::text, null::timestamptz)$$,
   '許可リストから外された A は connected=false の行を受け取る');
+select is(public.am_i_allowed(), false, '許可リストから外された A は am_i_allowed() が false');
 
 -- ---------- anon ----------
 reset role;
 set local role anon;
 select throws_ok($$select * from public.youtube_connections$$, '42501', null, 'anon は youtube_connections を読めない');
 select throws_ok($$select * from public.youtube_connection_status()$$, '42501', null, 'anon は youtube_connection_status を呼べない');
+select throws_ok($$select public.am_i_allowed()$$, '42501', null, 'anon は am_i_allowed を呼べない');
 
 select * from finish();
 rollback;

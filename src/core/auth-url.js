@@ -39,3 +39,12 @@ export function classifyAuth({ hadCode = false, denied = false, session = null, 
   if (error || hadCode) return 'unknown';
   return 'signedOut';
 }
+
+// ログイン済みでも、許可リストから外された人は止める。確認できなければ 'unknown'（拒否とも通過とも決めない）。
+export function resolveAllowed({ state, allowed = null, allowedError = null } = {}) {
+  if (state !== 'signedIn') return { state, denied: false };
+  if (allowedError) return { state: 'unknown', denied: false };
+  if (allowed === true) return { state: 'signedIn', denied: false };
+  if (allowed === false) return { state: 'signedOut', denied: true };
+  return { state: 'unknown', denied: false };
+}
