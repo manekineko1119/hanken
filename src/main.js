@@ -7,7 +7,7 @@ import { renderLives } from './views/lives.js';
 import { renderLiveDetail } from './views/live-detail.js';
 import { renderLiveEdit } from './views/live-edit.js';
 import { renderPrep, renderSettings } from './views/placeholder.js';
-import { el } from './ui/dom.js';
+import { el, setChildren } from './ui/dom.js';
 
 const main = document.querySelector('main');
 const tabbar = document.querySelector('#tabbar');
@@ -76,7 +76,7 @@ function render() {
   const view = VIEWS[route.path];
   if (!view) {
     // まだ作っていない画面は、一覧へ戻す導線だけ出す。
-    main.replaceChildren(el('p', { class: 'note', text: '準備中です' }), el('a', { class: 'back', href: '#/lives', text: 'ライブの一覧へ' }));
+    setChildren(main, el('p', { class: 'note', text: '準備中です' }), el('a', { class: 'back', href: '#/lives', text: 'ライブの一覧へ' }));
     return;
   }
   window.scrollTo(0, 0);

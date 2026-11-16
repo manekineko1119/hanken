@@ -1,4 +1,4 @@
-import { el, backLink, loadView } from '../ui/dom.js';
+import { el, backLink, loadView, setChildren } from '../ui/dom.js';
 import { getLive, saveLive } from '../data/lives.js';
 import { validateLive } from '../core/live-form.js';
 
@@ -113,7 +113,7 @@ function buildForm(container, state, isNew, alive) {
       e.preventDefault();
       onSave();
     });
-    container.replaceChildren(
+    setChildren(container,
       backLink(isNew ? '#/lives' : `#/live/${encodeURIComponent(state.id)}`, isNew ? '一覧へ' : '詳細へ'),
       el('h1', { text: isNew ? 'ライブを登録' : 'ライブを編集' }),
       form,
@@ -156,7 +156,7 @@ export function renderLiveEdit(container, ctx) {
   }
   loadView(container, ctx, () => getLive(id), (live) => {
     if (!live) {
-      container.replaceChildren(backLink('#/lives', '一覧へ'), el('p', { class: 'note', text: 'このライブは見つかりませんでした' }));
+      setChildren(container, backLink('#/lives', '一覧へ'), el('p', { class: 'note', text: 'このライブは見つかりませんでした' }));
       return;
     }
     buildForm(container, initialState(live), false, ctx.alive);

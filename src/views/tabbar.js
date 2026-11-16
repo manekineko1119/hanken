@@ -1,4 +1,4 @@
-import { el } from '../ui/dom.js';
+import { el, appendChildren } from '../ui/dom.js';
 
 const TABS = [
   { href: '#/lives', label: 'ライブ', paths: ['/lives', '/live/new', '/live/:id', '/live/:id/edit'] },
@@ -13,6 +13,6 @@ export function renderTabbar(nav, { visible, path }) {
   if (!visible) return;
   for (const t of TABS) {
     const current = t.paths.includes(path);
-    nav.append(el('a', { href: t.href, text: t.label, 'aria-current': current ? 'page' : null }));
+    appendChildren(nav, el('a', { href: t.href, text: t.label, 'aria-current': current ? 'page' : null }));
   }
 }

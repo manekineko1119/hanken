@@ -1,4 +1,20 @@
 // DOM を作る小さな部品。データは textContent だけで入れる（innerHTML は使わない）。
+
+// null・undefined・false を除く。replaceChildren/append に渡すと「null」という文字になるため。
+export function compact(children) {
+  return children.filter((c) => c !== null && c !== undefined && c !== false);
+}
+
+// container の中身を入れ替える。null などは無視する。
+export function setChildren(container, ...children) {
+  container.replaceChildren(...compact(children));
+}
+
+// container の後ろに足す。null などは無視する。
+export function appendChildren(container, ...children) {
+  container.append(...compact(children));
+}
+
 export function el(tag, props = {}, ...children) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(props)) {
@@ -8,7 +24,7 @@ export function el(tag, props = {}, ...children) {
     else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
     else node.setAttribute(k, v === true ? '' : v);
   }
-  node.append(...children.filter((c) => c !== null && c !== undefined && c !== false));
+  appendChildren(node, ...children);
   return node;
 }
 

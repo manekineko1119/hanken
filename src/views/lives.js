@@ -1,4 +1,4 @@
-import { el, loadView } from '../ui/dom.js';
+import { el, loadView, setChildren } from '../ui/dom.js';
 import { listLives } from '../data/lives.js';
 import { splitLives, todayJst, formatDateJa, liveHeading } from '../core/lives.js';
 
@@ -29,7 +29,7 @@ function section(heading, lives) {
 export function renderLives(container, ctx) {
   loadView(container, ctx, listLives, (lives) => {
     const { upcoming, past } = splitLives(lives, todayJst(new Date()));
-    container.replaceChildren(
+    setChildren(container,
       el('div', { class: 'page-head' }, el('h1', { text: 'ライブ' }), el('a', { class: 'button primary', href: '#/live/new', text: 'ライブを登録' })),
       section('これから', upcoming),
       section('行った', past),
