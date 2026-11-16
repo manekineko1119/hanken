@@ -79,3 +79,8 @@ export async function getPlaylistStatuses(liveId) {
   }
   return map;
 }
+
+// 別の iTunes アーティストを選んだとき、出演者に覚えさせる。
+export async function setArtistItunesId(liveArtistId, itunesArtistId) {
+  check(await getClient().from('live_artists').update({ itunes_artist_id: itunesArtistId }).eq('id', liveArtistId));
+}

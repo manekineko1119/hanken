@@ -1,6 +1,8 @@
 import { el, backLink, loadView, setChildren, appendChildren } from '../ui/dom.js';
 import { getLive, getPlaylistStatuses, deleteLive } from '../data/lives.js';
 import { formatDateJa, liveHeading } from '../core/lives.js';
+import { getPrepIds } from '../data/playlists.js';
+import { runStart } from './prep-flow.js';
 
 const STATUS_LABEL = { none: '未作成', draft: '下書き', saved: '保存済み' };
 const DELETE_CONFIRM = 'このライブを消しますか？アプリの中の予習の記録も消えます。YouTube 上のプレイリストは消えません。';
@@ -10,15 +12,24 @@ function text(v) {
   return typeof v === 'string' ? v.trim() : '';
 }
 
-function artistRow(artist, index, statuses) {
+function artistRow(artist, index, { live, statuses, prepIds, ctx, msg }) {
   const prep = statuses.get(artist.id)?.prep ?? 'none';
+  const prepId = prepIds.get(artist.id);
+  const action = prepId
+    ? el('a', { class: 'button', href: `#/playlist/${encodeURIComponent(prepId)}`, text: '開く' })
+    : el('button', { type: 'button', text: '作る' });
+  if (!prepId) {
+    action.addEventListener('click', () => runStart(
+      { name: artist.name, liveId: live.id, liveArtistId: artist.id, date: live.date, venue: text(live.venue) || undefined },
+      ctx, { button: action, msg },
+    ));
+  }
   return el(
     'li',
     { class: 'artist-row' },
     el('span', { class: 'artist-name', text: `${index + 1}. ${artist.name}` }),
     el('span', { class: `status status-${prep}`, text: `予習：${STATUS_LABEL[prep]}` }),
-    // 予習の作成は Task 9 で作る。
-    el('button', { type: 'button', disabled: true, text: '準備中' }),
+    action,
   );
 }
 
@@ -42,14 +53,15 @@ export function renderLiveDetail(container, ctx) {
     container,
     ctx,
     async () => {
-      const [live, statuses] = await Promise.all([getLive(id), getPlaylistStatuses(id)]);
-      return { live, statuses };
+      const [live, statuses, prepIds] = await Promise.all([getLive(id), getPlaylistStatuses(id), getPrepIds(id)]);
+      return { live, statuses, prepIds };
     },
-    ({ live, statuses }) => {
+    ({ live, statuses, prepIds }) => {
       if (!live) {
         setChildren(container, backLink('#/lives', '一覧へ'), el('p', { class: 'note', text: 'このライブは見つかりませんでした' }));
         return;
       }
+      const msg = el('p', { class: 'note error', role: 'alert', hidden: true });
       const del = el('button', { type: 'button', class: 'danger', text: '削除' });
       del.addEventListener('click', () => onDelete(live, container, del, ctx));
       setChildren(container,
@@ -58,7 +70,8 @@ export function renderLiveDetail(container, ctx) {
         el('p', { class: 'meta', text: formatDateJa(live.date) + (text(live.venue) ? `　${text(live.venue)}` : '') }),
         text(live.memo) ? el('p', { class: 'memo', text: live.memo }) : null,
         el('h2', { text: '出演者' }),
-        el('ul', { class: 'list' }, ...live.artists.map((a, i) => artistRow(a, i, statuses))),
+        el('ul', { class: 'list on-paper' }, ...live.artists.map((a, i) => artistRow(a, i, { live, statuses, prepIds, ctx, msg }))),
+        msg,
         el('div', { class: 'actions' }, el('a', { class: 'button', href: `#/live/${encodeURIComponent(live.id)}/edit`, text: '編集' }), del),
       );
     },

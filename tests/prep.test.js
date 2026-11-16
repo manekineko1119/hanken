@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickArtist, orderArtists, buildInitialTracks, replaceTrack } from '../src/core/prep.js';
+import { pickArtist, orderArtists, buildInitialTracks, replaceTrack, hasPopularity, moveTrack, addManualTrack } from '../src/core/prep.js';
 
 const pop = (n) => Array.from({ length: n }, (_, i) => ({ title: `P${i + 1}`, source: 'lastfm' }));
 const rec = (n) => Array.from({ length: n }, (_, i) => ({ title: `R${i + 1}`, source: 'itunes' }));
@@ -113,4 +113,38 @@ test('replaceTrack: index が範囲外なら何もしない', () => {
     assert.equal(r.tracks.length, 10);
     assert.deepEqual(r.tracks, init.tracks);
   }
+});
+
+const T = (title, isLatest = false) => ({ title, artistName: 'A', source: 'itunes', isLatest });
+
+test('hasPopularity: lastfm の曲か rest.popular があれば true', () => {
+  assert.equal(hasPopularity([T('a')], { popular: [], recent: [] }), false);
+  assert.equal(hasPopularity([{ ...T('a'), source: 'lastfm' }], { popular: [], recent: [] }), true);
+  assert.equal(hasPopularity([T('a')], { popular: [{ title: 'x', source: 'lastfm' }], recent: [] }), true);
+  assert.equal(hasPopularity([T('a')], null), false);
+});
+
+test('moveTrack: 上下に動かす。最新の枠は最後のまま', () => {
+  const ts = [T('a'), T('b'), T('c'), T('L', true)];
+  assert.deepEqual(moveTrack(ts, 1, 'up').map((t) => t.title), ['b', 'a', 'c', 'L']);
+  assert.deepEqual(moveTrack(ts, 1, 'down').map((t) => t.title), ['a', 'c', 'b', 'L']);
+  assert.equal(moveTrack(ts, 0, 'up'), ts);
+  assert.equal(moveTrack(ts, 2, 'down'), ts); // 最新の下へは動かせない
+  assert.equal(moveTrack(ts, 3, 'up'), ts); // 最新は動かせない
+  assert.equal(moveTrack(ts, 9, 'up'), ts);
+});
+
+test('addManualTrack: 最新の枠の前に足す。空・重複は無視', () => {
+  const ts = [T('a'), T('L', true)];
+  const r = addManualTrack(ts, '  新曲 ', 'A');
+  assert.deepEqual(r.tracks.map((t) => t.title), ['a', '新曲', 'L']);
+  assert.deepEqual(r.tracks[1], { title: '新曲', artistName: 'A', source: 'manual', isLatest: false });
+  assert.equal(r.duplicate, false);
+  assert.deepEqual(addManualTrack([T('a')], '新曲', 'A').tracks.map((t) => t.title), ['a', '新曲']);
+  const dup = addManualTrack(ts, 'Ａ', 'A');
+  assert.equal(dup.tracks, ts);
+  assert.equal(dup.duplicate, true);
+  const empty = addManualTrack(ts, '   ', 'A');
+  assert.equal(empty.tracks, ts);
+  assert.equal(empty.duplicate, false);
 });
