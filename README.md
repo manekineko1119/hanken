@@ -1,4 +1,6 @@
-# Liveapp
+# 半券（LIVE TICKET STUB）
+
+アプリの名前は「半券」。リポジトリ・フォルダ・DB の名前は `liveapp` のまま。
 
 ライブに行く人のための PWA。ライブの予定を登録し、出演者の予習プレイリストを作る。
 静的な ES modules（GitHub Pages で配信）と Supabase でできている。

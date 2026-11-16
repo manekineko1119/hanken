@@ -3,8 +3,10 @@ export function renderLogin(container, { denied = false, unknown = false, startF
   container.replaceChildren();
 
   const h1 = document.createElement('h1');
-  h1.textContent = 'Liveapp';
-  container.append(h1);
+  h1.textContent = '半券';
+  const sub = document.createElement('p');
+  sub.textContent = 'LIVE TICKET STUB';
+  container.append(h1, sub);
 
   if (denied || unknown) {
     const msg = document.createElement('p');
