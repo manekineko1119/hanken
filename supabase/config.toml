@@ -435,7 +435,9 @@ secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 skip_nonce_check = false
 
 [functions.artist-search]
+entrypoint = "./functions/artist-search/index.js"
 verify_jwt = true
 
 [functions.track-candidates]
+entrypoint = "./functions/track-candidates/index.js"
 verify_jwt = true
