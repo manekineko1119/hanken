@@ -8,7 +8,7 @@ const LOCAL_ORIGINS = ['http://localhost:8080', 'http://127.0.0.1:8080'];
 export function corsHeaders(origin, env) {
   const allowed = [...LOCAL_ORIGINS];
   const app = env?.('APP_ORIGIN');
-  if (app) allowed.push(app);
+  if (app) allowed.push(app.replace(/\/+$/, ''));
   const h = { Vary: 'Origin' };
   if (origin && allowed.includes(origin)) {
     h['Access-Control-Allow-Origin'] = origin;

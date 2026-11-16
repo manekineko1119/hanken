@@ -4,10 +4,11 @@ export const ORIGIN = 'http://localhost:8080';
 export const NOW = new Date('2026-11-17T00:00:00Z');
 export const daysAgo = (n) => new Date(NOW.getTime() - n * 86400000).toISOString();
 
-export function makeDeps({ fetchMap = () => { throw new Error('no fetch'); }, env = {}, tables = {}, allowed = true } = {}) {
+export function makeDeps({ fetchMap = () => { throw new Error('no fetch'); }, env = {}, tables = {}, allowed = true, errors = {} } = {}) {
   const calls = [];
   const db = fakeDb({
     users: { goodjwt: { id: 'u1', email: ' Me@Example.COM ' } },
+    errors,
     tables: { allowed_emails: allowed ? [{ email: 'me@example.com' }] : [], ...tables },
   });
   const fetch = async (url) => {
