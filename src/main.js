@@ -6,10 +6,37 @@ import { renderLogin } from './views/login.js';
 const main = document.querySelector('main');
 let authState = 'unknown';
 let denied = false;
+let starting = false;
+let startFailed = false;
+
+function store(fn) {
+  try {
+    return fn(sessionStorage);
+  } catch {
+    return null; // 保存できなくても画面は出す
+  }
+}
+
+async function onSignIn() {
+  if (starting) return;
+  starting = true;
+  startFailed = false;
+  let ok = false;
+  try {
+    ({ ok } = await signIn());
+  } catch {
+    ok = false;
+  }
+  if (!ok) {
+    starting = false;
+    startFailed = true;
+    render();
+  }
+}
 
 function render() {
   if (authState !== 'signedIn') {
-    renderLogin(main, { denied, unknown: authState === 'unknown', onSignIn: signIn });
+    renderLogin(main, { denied, unknown: authState === 'unknown', startFailed, onSignIn });
     return;
   }
   main.textContent = parseHash(location.hash).path;
@@ -19,15 +46,16 @@ async function start() {
   const ret = readAuthReturn(location.href);
   denied = ret.denied;
   // 先に状態を確かめる（Supabase が URL の code を読み終えてから URL を直す）。
-  authState = await getAuthState();
+  authState = await getAuthState({ hadCode: ret.code !== null, denied });
   history.replaceState(null, '', ret.cleanUrl);
 
-  if (authState === 'signedOut' && location.hash !== '#/login') {
-    history.replaceState(null, '', '#/login');
+  if (authState === 'signedOut') {
+    store((s) => s.removeItem(RETURN_TO_KEY));
+    if (location.hash !== '#/login') history.replaceState(null, '', '#/login');
   } else if (authState === 'signedIn') {
-    const saved = sessionStorage.getItem(RETURN_TO_KEY);
+    const saved = store((s) => s.getItem(RETURN_TO_KEY));
     if (saved !== null || location.hash === '#/login') {
-      sessionStorage.removeItem(RETURN_TO_KEY);
+      store((s) => s.removeItem(RETURN_TO_KEY));
       history.replaceState(null, '', pickReturnTo(saved));
     }
   }

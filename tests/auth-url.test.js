@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readAuthReturn, pickReturnTo } from '../src/core/auth-url.js';
+import { readAuthReturn, pickReturnTo, classifyAuth } from '../src/core/auth-url.js';
 
 test('拒否された戻り：denied が true で、クエリとハッシュの error が消える', () => {
   const r = readAuthReturn(
@@ -60,4 +60,24 @@ test('pickReturnTo：外部・空・null は #/lives', () => {
   assert.equal(pickReturnTo(''), '#/lives');
   assert.equal(pickReturnTo(null), '#/lives');
   assert.equal(pickReturnTo('#evil'), '#/lives');
+});
+
+const S = { user: 'u' };
+test('classifyAuth：code あり・session なし は unknown', () => {
+  assert.equal(classifyAuth({ hadCode: true, session: null }), 'unknown');
+});
+test('classifyAuth：code あり・session あり は signedIn', () => {
+  assert.equal(classifyAuth({ hadCode: true, session: S }), 'signedIn');
+});
+test('classifyAuth：denied と init エラー は signedOut', () => {
+  assert.equal(classifyAuth({ denied: true, session: null, error: new Error('x') }), 'signedOut');
+});
+test('classifyAuth：code なし・session なし・エラーなし は signedOut', () => {
+  assert.equal(classifyAuth({ session: null }), 'signedOut');
+});
+test('classifyAuth：タイムアウト は unknown', () => {
+  assert.equal(classifyAuth({ timedOut: true, session: S }), 'unknown');
+});
+test('classifyAuth：code なしのエラー は unknown', () => {
+  assert.equal(classifyAuth({ session: null, error: new Error('x') }), 'unknown');
 });
