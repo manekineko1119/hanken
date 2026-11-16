@@ -1,0 +1,7 @@
+.env*
+supabase/.temp/
+*.local.*
+docs/
+feedback/
+node_modules/
+.superpowers/
