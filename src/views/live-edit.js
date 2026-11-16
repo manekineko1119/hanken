@@ -23,7 +23,7 @@ function toPayload(state) {
   const artists = state.artists.map((a) => {
     const out = { name: a.name };
     if (a.id) out.id = a.id;
-    if (a.id && a.name !== a.original) out.itunes_artist_id = null;
+    if (a.id && a.name.trim() !== a.original.trim()) out.itunes_artist_id = null;
     return out;
   });
   return { live: { id: state.id, date: state.date, venue: orNull(state.venue), title: orNull(state.title), memo: orNull(state.memo) }, artists };
@@ -43,8 +43,10 @@ function bind(input, state, key) {
 function artistRow(state, index, rerender) {
   const a = state.artists[index];
   const name = el('input', { type: 'text', value: a.name, 'aria-label': `出演者 ${index + 1}`, autocomplete: 'off' });
+  const warn = el('p', { class: 'note error artist-warn', text: '名前を空にすると、この出演者と予習の記録は保存のときに消えます', hidden: !(a.id && a.name.trim() === '') });
   name.addEventListener('input', () => {
     a.name = name.value;
+    warn.hidden = !(a.id && a.name.trim() === '');
   });
   const move = (delta) => () => {
     const j = index + delta;
@@ -67,10 +69,11 @@ function artistRow(state, index, rerender) {
         rerender();
       },
     }),
+    warn,
   );
 }
 
-function buildForm(container, state, isNew) {
+function buildForm(container, state, isNew, alive) {
   let errors = {};
   let saveFailed = false;
   let saving = false;
@@ -128,7 +131,7 @@ function buildForm(container, state, isNew) {
     const { live, artists } = toPayload(state);
     try {
       const id = await saveLive(live, artists);
-      location.hash = `#/live/${encodeURIComponent(id)}`;
+      if (alive()) location.hash = `#/live/${encodeURIComponent(id)}`;
       return;
     } catch (err) {
       // 作成のあとで失敗したときは、次は同じライブを更新する（重複して作らない）。
@@ -136,7 +139,7 @@ function buildForm(container, state, isNew) {
       saveFailed = true;
     }
     saving = false;
-    draw();
+    if (alive()) draw();
   }
 
   draw();
@@ -145,7 +148,7 @@ function buildForm(container, state, isNew) {
 export function renderLiveEdit(container, ctx) {
   const id = ctx.params.id;
   if (!id) {
-    buildForm(container, initialState(null), true);
+    buildForm(container, initialState(null), true, ctx.alive);
     return;
   }
   loadView(container, ctx, () => getLive(id), (live) => {
@@ -153,6 +156,6 @@ export function renderLiveEdit(container, ctx) {
       container.replaceChildren(backLink('#/lives', '一覧へ'), el('p', { class: 'note', text: 'このライブは見つかりませんでした' }));
       return;
     }
-    buildForm(container, initialState(live), false);
+    buildForm(container, initialState(live), false, ctx.alive);
   });
 }

@@ -52,6 +52,17 @@ async function onSignIn() {
   }
 }
 
+// ログアウトできたあと：状態を戻し、タブを出さずにログイン画面へ。
+function onSignedOut() {
+  authState = 'signedOut';
+  denied = false;
+  startFailed = false;
+  starting = false;
+  store((s) => s.removeItem(RETURN_TO_KEY));
+  location.hash = '#/login'; // hashchange でも描くが、同じ内容なので二重でも害はない
+  render();
+}
+
 function render() {
   const current = ++renderId;
   appHeader.hidden = authState !== 'signedIn';
@@ -69,7 +80,7 @@ function render() {
     return;
   }
   window.scrollTo(0, 0);
-  view(main, { params: route.params, query: route.query, alive: () => current === renderId });
+  view(main, { params: route.params, query: route.query, alive: () => current === renderId, onSignedOut });
 }
 
 async function start() {

@@ -112,7 +112,7 @@ input[type="text"], input[type="date"], textarea {
 
 .field { margin: 16px 0; }
 .label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 4px; }
-.artist-edit { display: flex; align-items: center; gap: 4px; padding: 6px 0; }
+.artist-edit { flex-wrap: wrap; display: flex; align-items: center; gap: 4px; padding: 6px 0; }
 .artist-edit input { flex: 1; min-width: 0; }
 .artist-edit button { padding: 0 8px; }
 .field > button { margin-top: 8px; }
@@ -137,3 +137,5 @@ input[type="text"], input[type="date"], textarea {
   font-size: 14px;
 }
 #tabbar a[aria-current="page"] { color: var(--accent); font-weight: 700; }
+.artist-warn { flex-basis: 100%; margin: 0; font-size: 14px; }
+.artist-warn[hidden] { display: none; }

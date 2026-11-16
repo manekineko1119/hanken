@@ -5,7 +5,7 @@ export function renderPrep(container) {
   container.replaceChildren(el('h1', { text: '予習だけ' }), el('p', { class: 'note', text: '準備中です' }));
 }
 
-export function renderSettings(container) {
+export function renderSettings(container, ctx) {
   const msg = el('p', { class: 'note error', role: 'alert', hidden: true });
   const out = el('button', { type: 'button', text: 'ログアウト' });
   out.addEventListener('click', async () => {
@@ -18,9 +18,10 @@ export function renderSettings(container) {
       ok = false;
     }
     if (ok) {
-      location.hash = '#/login';
+      ctx.onSignedOut();
       return;
     }
+    if (!ctx.alive()) return;
     out.disabled = false;
     msg.textContent = 'ログアウトできませんでした（通信できません）';
     msg.hidden = false;
