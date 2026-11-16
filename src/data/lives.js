@@ -1,10 +1,12 @@
 // ライブの保存・読み込み（Supabase）。薄く保つ。判断は src/core/ に置く。
 import { getClient } from '../auth/auth.js';
+import { planArtistChanges } from '../core/live-form.js';
 
 function check({ error }) {
   if (error) throw error;
 }
 
+// 日付の昇順で返す。upcoming/past の並びは core/lives.js の splitLives が決める（past は降順）。
 export async function listLives() {
   const { data, error } = await getClient()
     .from('lives')
@@ -26,7 +28,8 @@ export async function getLive(id) {
   return data;
 }
 
-// upsert は使わない（設計 5.2）。live を insert か update したあと、出演者を入れ替える。
+// upsert は使わない（設計 5.2）。出演者は差分で保存する（行を消して入れ直すと、プレイリストが cascade で消える）。
+// 新規 live の作成後に失敗したら、err.liveId に id を付ける（画面は update として再試行できる）。
 export async function saveLive(live, artists) {
   const db = getClient();
   const fields = { date: live.date, venue: live.venue ?? null, title: live.title ?? null, memo: live.memo ?? null };
@@ -38,12 +41,21 @@ export async function saveLive(live, artists) {
     if (error) throw error;
     id = data.id;
   }
-  check(await db.from('live_artists').delete().eq('live_id', id));
-  const rows = artists
-    .map((a) => ({ name: String(a.name ?? '').trim(), itunes_artist_id: a.itunes_artist_id ?? null }))
-    .filter((a) => a.name)
-    .map((a, position) => ({ live_id: id, ...a, position }));
-  if (rows.length) check(await db.from('live_artists').insert(rows));
+  try {
+    const { data: existing, error } = await db.from('live_artists').select('id, name, position').eq('live_id', id);
+    if (error) throw error;
+    const plan = planArtistChanges(existing, artists);
+    if (plan.deletes.length) check(await db.from('live_artists').delete().in('id', plan.deletes));
+    for (const { id: artistId, ...rest } of plan.updates) {
+      check(await db.from('live_artists').update(rest).eq('id', artistId));
+    }
+    if (plan.inserts.length) {
+      check(await db.from('live_artists').insert(plan.inserts.map((r) => ({ live_id: id, ...r }))));
+    }
+  } catch (err) {
+    err.liveId = id;
+    throw err;
+  }
   return id;
 }
 
