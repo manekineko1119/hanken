@@ -1,0 +1,92 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { pickArtist, orderArtists, buildInitialTracks, replaceTrack } from '../src/core/prep.js';
+
+const pop = (n) => Array.from({ length: n }, (_, i) => ({ title: `P${i + 1}`, source: 'lastfm' }));
+const rec = (n) => Array.from({ length: n }, (_, i) => ({ title: `R${i + 1}`, source: 'itunes' }));
+
+test('pickArtist: 完全一致がちょうど1つのときだけ返す', () => {
+  assert.equal(pickArtist('バンドA', [{ name: 'バンドA' }, { name: 'バンドA' }]), null);
+  assert.deepEqual(pickArtist('バンドａ', [{ id: 1, name: 'バンドA' }, { id: 2, name: 'バンドB' }]), { id: 1, name: 'バンドA' });
+  assert.equal(pickArtist('バンドC', [{ name: 'バンドA' }]), null);
+});
+
+test('orderArtists: 完全一致 → 含む → そのほか、組の中は元の順', () => {
+  const c = [{ name: 'Zeta' }, { name: 'Foo Band 2' }, { name: 'foo band' }, { name: 'Alpha' }, { name: 'Foo Band 1' }, { name: 'xy' }];
+  assert.deepEqual(orderArtists('Foo Band', c).map((x) => x.name),
+    ['foo band', 'Foo Band 2', 'Foo Band 1', 'Zeta', 'Alpha', 'xy']);
+});
+
+test('orderArtists: 逆向きの包含（名前が query に含まれる）も含む扱い', () => {
+  const c = [{ name: 'Other' }, { name: 'Foo' }];
+  assert.deepEqual(orderArtists('Foo Band', c).map((x) => x.name), ['Foo', 'Other']);
+});
+
+test('buildInitialTracks: popular15・recent5 → 10曲、最後だけ最新', () => {
+  const { tracks } = buildInitialTracks({ popular: pop(15), recent: rec(5) }, 'バンドA');
+  assert.equal(tracks.length, 10);
+  assert.deepEqual(tracks.slice(0, 9).map((t) => t.title), ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9']);
+  assert.equal(tracks.filter((t) => t.isLatest).length, 1);
+  assert.equal(tracks[9].isLatest, true);
+  assert.equal(tracks[9].title, 'R1');
+  assert.equal(tracks[0].artistName, 'バンドA');
+});
+
+test('buildInitialTracks: recent 先頭が popular にもあるとき重複しない', () => {
+  const popular = [{ title: 'R1', source: 'lastfm' }, ...pop(14)];
+  const { tracks } = buildInitialTracks({ popular, recent: rec(5) }, 'A');
+  assert.equal(tracks.length, 10);
+  assert.equal(tracks.filter((t) => t.title === 'R1').length, 1);
+  assert.equal(tracks[9].title, 'R1');
+  assert.equal(tracks[9].isLatest, true);
+  assert.deepEqual(tracks.slice(0, 9).map((t) => t.title), ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9']);
+});
+
+test('buildInitialTracks: popular 3曲 → recent で埋めて10曲', () => {
+  const { tracks } = buildInitialTracks({ popular: pop(3), recent: rec(8) }, 'A');
+  assert.equal(tracks.length, 10);
+  assert.equal(tracks[9].isLatest, true);
+  assert.equal(tracks[9].title, 'R1');
+  assert.deepEqual(tracks.slice(0, 3).map((t) => t.title), ['P1', 'P2', 'P3']);
+  assert.equal(new Set(tracks.map((t) => t.title)).size, 10);
+});
+
+test('buildInitialTracks: popular 空 → recent だけで10曲', () => {
+  const { tracks } = buildInitialTracks({ popular: [], recent: rec(12) }, 'A');
+  assert.equal(tracks.length, 10);
+  assert.equal(tracks.filter((t) => t.isLatest).length, 1);
+  assert.equal(tracks[9].isLatest, true);
+  assert.equal(tracks[9].title, 'R1');
+});
+
+test('replaceTrack: 普通の曲を消すと popular の残りの先頭が入る', () => {
+  const init = buildInitialTracks({ popular: pop(15), recent: rec(5) }, 'A');
+  const r = replaceTrack(init.tracks, init.rest, 2, 'A');
+  assert.equal(r.tracks.length, 10);
+  assert.ok(!r.tracks.some((t) => t.title === 'P3'));
+  assert.ok(r.tracks.some((t) => t.title === 'P10' && !t.isLatest));
+  assert.equal(r.tracks[9].isLatest, true);
+});
+
+test('replaceTrack: 最新の枠を消すと recent の次が最新で最後に入る', () => {
+  const init = buildInitialTracks({ popular: pop(15), recent: rec(5) }, 'A');
+  const r = replaceTrack(init.tracks, init.rest, 9, 'A');
+  assert.equal(r.tracks.length, 10);
+  assert.equal(r.tracks[9].title, 'R2');
+  assert.equal(r.tracks[9].isLatest, true);
+  assert.equal(r.tracks.filter((t) => t.isLatest).length, 1);
+});
+
+test('replaceTrack: 候補が尽きると9曲になる', () => {
+  const init = buildInitialTracks({ popular: pop(9), recent: rec(1) }, 'A');
+  assert.equal(init.tracks.length, 10);
+  const r = replaceTrack(init.tracks, init.rest, 0, 'A');
+  assert.equal(r.tracks.length, 9);
+});
+
+test('replaceTrack: 元の配列を変えない', () => {
+  const init = buildInitialTracks({ popular: pop(15), recent: rec(5) }, 'A');
+  const before = JSON.stringify(init);
+  replaceTrack(init.tracks, init.rest, 0, 'A');
+  assert.equal(JSON.stringify(init), before);
+});
