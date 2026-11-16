@@ -1,6 +1,7 @@
 // ブラウザと Supabase Edge Functions（Deno）の両方で使う。Node/Deno 固有の API は使わない。
 
 // 名前・曲名のそろえ方：NFKC、小文字、空白と記号を除く。
+// 記号だけの曲名は空のキーになり、buildCandidates で落ちる（受け入れ済み）。
 export function normalizeName(s) {
   return String(s ?? '')
     .normalize('NFKC')
@@ -37,9 +38,8 @@ export function isExcludedTitle(title) {
   const t = String(title ?? '').normalize('NFKC').toLowerCase();
   if (/カラオケ|karaoke/.test(t)) return true;
   if (/(^|[^a-z])(instrumental|inst|off\s*vocal|tv\s*size)([^a-z]|$)/.test(t)) return true;
-  // 「Live」は曲名の一部のこともあるので、括弧・ハイフンの中か、末尾にあるときだけ。
+  // 「Live」は曲名の一部のこともあるので、括弧・ハイフンのあとにあるときだけ。
   const inBrackets = [...t.matchAll(/[(\[]([^()\[\]]*)[)\]]/g)].map((m) => m[1]);
   return inBrackets.some((x) => /(^|[^a-z])live([^a-z]|$)/.test(x))
-    || /\s[-–—]\s*live/.test(t)
-    || /\slive$/.test(t);
+    || /\s[-–—]\s*live\b/.test(t);
 }

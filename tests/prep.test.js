@@ -90,3 +90,27 @@ test('replaceTrack: 元の配列を変えない', () => {
   replaceTrack(init.tracks, init.rest, 0, 'A');
   assert.equal(JSON.stringify(init), before);
 });
+
+test('pickArtist: 空の query は null', () => {
+  assert.equal(pickArtist('', [{ name: '！' }]), null);
+  assert.equal(pickArtist('  ', [{ name: '' }]), null);
+});
+
+test('replaceTrack: 消した曲が rest に残っていても出し直さない', () => {
+  const init = buildInitialTracks({ popular: pop(15), recent: rec(5) }, 'A');
+  const tracks = [...init.tracks.slice(0, 9), { title: 'P10', artistName: 'A', source: 'manual', isLatest: false }];
+  tracks.push(init.tracks[9]);
+  const r = replaceTrack(tracks, init.rest, 9, 'A');
+  assert.ok(!r.tracks.some((t) => t.title === 'P10'));
+  assert.ok(r.tracks.some((t) => t.title === 'P11'));
+  assert.ok(!r.rest.popular.some((c) => c.title === 'P10'));
+});
+
+test('replaceTrack: index が範囲外なら何もしない', () => {
+  const init = buildInitialTracks({ popular: pop(15), recent: rec(5) }, 'A');
+  for (const i of [-1, 10, 99, 1.5]) {
+    const r = replaceTrack(init.tracks, init.rest, i, 'A');
+    assert.equal(r.tracks.length, 10);
+    assert.deepEqual(r.tracks, init.tracks);
+  }
+});
