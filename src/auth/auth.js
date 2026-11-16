@@ -1,7 +1,7 @@
 // Supabase Auth（Google ログイン）。ブラウザの API は関数の中でだけ使う。
 import { createClient } from '../../vendor/supabase-js.mjs';
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from '../config.js';
-import { pickReturnTo } from '../core/auth-url.js';
+import { pickReturnTo, classifyAuth } from '../core/auth-url.js';
 
 export const RETURN_TO_KEY = 'liveapp.returnTo';
 const TIMEOUT_MS = 3000;
@@ -23,22 +23,23 @@ export function getClient() {
 }
 
 // 'signedIn' | 'signedOut' | 'unknown'。3秒で打ち切り、通信の失敗も 'unknown'（未ログイン扱いにしない）。
-export async function getAuthState() {
+export async function getAuthState({ hadCode = false, denied = false } = {}) {
   let timer;
   const timeout = new Promise((resolve) => {
-    timer = setTimeout(() => resolve('unknown'), TIMEOUT_MS);
+    timer = setTimeout(() => resolve({ timedOut: true }), TIMEOUT_MS);
   });
   const check = (async () => {
     try {
-      const { data, error } = await getClient().auth.getSession();
-      if (error) return 'unknown';
-      return data.session ? 'signedIn' : 'signedOut';
-    } catch {
-      return 'unknown';
+      const auth = getClient().auth;
+      const init = await auth.initialize(); // URL の code の交換を待つ
+      const { data, error } = await auth.getSession();
+      return { session: data?.session ?? null, error: init?.error ?? error ?? null };
+    } catch (error) {
+      return { session: null, error };
     }
   })();
   try {
-    return await Promise.race([check, timeout]);
+    return classifyAuth({ hadCode, denied, ...(await Promise.race([check, timeout])) });
   } finally {
     clearTimeout(timer);
   }

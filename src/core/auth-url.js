@@ -30,3 +30,12 @@ export function pickReturnTo(saved) {
   if (saved === '#/login' || saved.startsWith('#/login?')) return FALLBACK;
   return saved;
 }
+
+// ログインの状態を決める。code の交換に失敗したときに、未ログインと取り違えない。
+export function classifyAuth({ hadCode = false, denied = false, session = null, error = null, timedOut = false } = {}) {
+  if (timedOut) return 'unknown';
+  if (session) return 'signedIn';
+  if (denied) return 'signedOut';
+  if (error || hadCode) return 'unknown';
+  return 'signedOut';
+}

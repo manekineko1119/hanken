@@ -1,5 +1,5 @@
 // ログイン画面。state: { denied: boolean, unknown: boolean }。
-export function renderLogin(container, { denied = false, unknown = false, onSignIn }) {
+export function renderLogin(container, { denied = false, unknown = false, startFailed = false, onSignIn }) {
   container.replaceChildren();
 
   const h1 = document.createElement('h1');
@@ -20,4 +20,11 @@ export function renderLogin(container, { denied = false, unknown = false, onSign
   button.textContent = 'Google でログイン';
   button.addEventListener('click', onSignIn);
   container.append(button);
+
+  if (startFailed) {
+    const err = document.createElement('p');
+    err.setAttribute('role', 'alert');
+    err.textContent = 'ログインを始められませんでした。通信を確かめてください';
+    container.append(err);
+  }
 }
