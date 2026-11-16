@@ -17,12 +17,13 @@ function row(live) {
   );
 }
 
-function section(heading, lives) {
+// kind: 'upcoming'（半券の付いた券）か 'past'（半券を切り取ったあとの券）。見た目は app.css の .tickets-*。
+function section(heading, lives, kind) {
   return el(
     'section',
     {},
     el('h2', { text: heading }),
-    lives.length ? el('ul', { class: 'list' }, ...lives.map(row)) : el('p', { class: 'note', text: 'まだありません' }),
+    lives.length ? el('ul', { class: `list tickets tickets-${kind}` }, ...lives.map(row)) : el('p', { class: 'note', text: 'まだありません' }),
   );
 }
 
@@ -31,8 +32,8 @@ export function renderLives(container, ctx) {
     const { upcoming, past } = splitLives(lives, todayJst(new Date()));
     setChildren(container,
       el('div', { class: 'page-head' }, el('h1', { text: 'ライブ' }), el('a', { class: 'button primary', href: '#/live/new', text: 'ライブを登録' })),
-      section('これから', upcoming),
-      section('行った', past),
+      section('これから', upcoming, 'upcoming'),
+      section('行った', past, 'past'),
     );
   });
 }

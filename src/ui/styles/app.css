@@ -1,26 +1,24 @@
+/* 見た目の土台：夜の会場の黒の地に、生成りの紙の半券（アイコンと同じ色。2026-11-17 に案 A を選んだ）。
+   明るいモードは作らない。文字の多い所は明るい紙の上に載せる。 */
 :root {
-  --bg: #fafaf7;
-  --surface: #ffffff;
-  --text: #1c1c1a;
-  --muted: #6a6a64;
-  --line: #deded8;
-  --accent: #2b4c7e;
-  --accent-text: #ffffff;
-  --danger: #b3261e;
+  color-scheme: dark;
+  --bg: #1d1c1a;        /* 夜の会場の黒 */
+  --surface: #2a2926;   /* フィルムの帯 */
+  --text: #ede6d6;
+  --muted: #a39c8c;
+  --line: #3a3833;
+  --accent: #a9bccd;    /* 雨の青（暗い地の上） */
+  --accent-text: #1d1c1a;
+  --danger: #e8968a;
+  --paper: #e9dfc8;     /* 半券の紙（生成り） */
+  --paper-old: #dcd1b8; /* 行ったライブの紙 */
+  --ink: #3f3b33;
+  --ink-soft: #6e675a;
+  --perf: rgba(63, 59, 51, 0.32); /* ミシン目 */
+  --rain: #5e7387;      /* 雨の青（紙の上） */
+  --night: #151412;
   --font: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #151514;
-    --surface: #1f1f1d;
-    --text: #ecece6;
-    --muted: #9b9b93;
-    --line: #34342f;
-    --accent: #8fb0e3;
-    --accent-text: #11161d;
-    --danger: #f2897f;
-  }
+  --mincho: "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", serif;
 }
 
 * { box-sizing: border-box; }
@@ -49,11 +47,11 @@ main { padding-top: 16px; padding-bottom: 96px; }
   padding-top: 12px;
 }
 #app-header[hidden], #tabbar[hidden] { display: none; }
-.app-name { font-size: 18px; font-weight: 700; }
+.app-name { font-family: var(--mincho); font-size: 20px; font-weight: 600; }
 .app-sub { font-size: 11px; letter-spacing: 0.08em; color: var(--muted); }
 
-h1 { font-size: 22px; margin: 8px 0 12px; }
-h2 { font-size: 16px; margin: 24px 0 8px; color: var(--muted); }
+h1 { font-family: var(--mincho); font-size: 23px; font-weight: 600; line-height: 1.45; margin: 8px 0 12px; }
+h2 { font-size: 14px; font-weight: 400; margin: 28px 0 10px; color: var(--muted); }
 a { color: var(--accent); }
 
 button, .button {
@@ -71,10 +69,12 @@ button, .button {
   text-decoration: none;
   cursor: pointer;
 }
+/* いちばん押してほしいボタンは、券と同じ紙の色 */
 button.primary, .button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-text);
+  background: var(--paper);
+  border-color: var(--paper);
+  color: var(--ink);
+  font-weight: 600;
 }
 button.danger { color: var(--danger); border-color: var(--danger); }
 button:disabled { opacity: 0.5; cursor: default; }
@@ -95,20 +95,103 @@ input[type="text"], input[type="date"], textarea {
 .back { display: inline-flex; align-items: center; min-height: 44px; }
 .note { color: var(--muted); margin: 8px 0; }
 .error { color: var(--danger); }
-.meta { margin: 0 0 8px; color: var(--muted); }
+.meta { margin: 0 0 8px; font-family: var(--mincho); font-size: 16px; color: var(--text); }
 .memo { white-space: pre-wrap; }
 
 .list { list-style: none; margin: 0; padding: 0; }
 .list > li { border-bottom: 1px solid var(--line); }
 .row { display: flex; flex-direction: column; padding: 12px 0; min-height: 44px; color: inherit; text-decoration: none; }
-.row-date { font-size: 14px; color: var(--muted); }
-.row-title { font-weight: 600; }
-.row-sub { font-size: 14px; color: var(--muted); }
+.row-date { font-family: var(--mincho); font-size: 15px; letter-spacing: 0.03em; color: var(--muted); }
+.row-title { font-family: var(--mincho); font-size: 18px; font-weight: 600; line-height: 1.45; margin: 2px 0; }
+.row-sub { font-size: 13px; color: var(--muted); }
 
-.artist-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; }
-.artist-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.status { font-size: 14px; color: var(--muted); }
-.status-saved { color: var(--accent); }
+/* ライブの一覧：1つのライブが1枚の券。
+   これから＝右にミシン目と半券が付いた券。行った＝半券を切り取ったあとの短い券（右の端がミシン目）。 */
+.tickets > li { border-bottom: 0; margin: 0 0 12px; }
+.tickets .row {
+  position: relative;
+  padding: 14px 18px;
+  border-radius: 5px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.tickets .row-date, .tickets .row-sub { color: var(--ink-soft); }
+
+.tickets-upcoming .row {
+  --stub: 62px;
+  padding-right: calc(var(--stub) + 18px);
+  /* ミシン目の上下の切り欠き */
+  -webkit-mask:
+    radial-gradient(circle 8px at calc(100% - var(--stub)) 0, #0000 97%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle 8px at calc(100% - var(--stub)) 100%, #0000 97%, #000) bottom / 100% 51% no-repeat;
+  mask:
+    radial-gradient(circle 8px at calc(100% - var(--stub)) 0, #0000 97%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle 8px at calc(100% - var(--stub)) 100%, #0000 97%, #000) bottom / 100% 51% no-repeat;
+}
+.tickets-upcoming .row::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  right: calc(var(--stub) - 1px);
+  border-left: 2px dashed var(--perf);
+}
+.tickets-upcoming .row::before {
+  content: "半";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--stub);
+  display: grid;
+  place-items: center;
+  font-family: var(--mincho);
+  font-size: 24px;
+  font-weight: 600;
+  color: rgba(63, 59, 51, 0.5);
+}
+
+.tickets-past .row {
+  margin-right: 58px;
+  padding-right: 20px;
+  border-radius: 5px 0 0 5px;
+  background: var(--paper-old);
+  -webkit-mask: radial-gradient(circle 4px at 100% 50%, #0000 95%, #000) 0 0 / 100% 11px repeat-y;
+  mask: radial-gradient(circle 4px at 100% 50%, #0000 95%, #000) 0 0 / 100% 11px repeat-y;
+}
+
+/* 紙の上に並べるもの（ライブの詳細の出演者）。区切りはミシン目。 */
+.on-paper {
+  padding: 4px 16px;
+  border-radius: 5px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.on-paper > li { border-bottom: 2px dashed rgba(63, 59, 51, 0.25); }
+.on-paper > li:last-child { border-bottom: 0; }
+.on-paper button, .on-paper .button { background: transparent; color: var(--ink); border-color: rgba(63, 59, 51, 0.3); }
+.on-paper :focus-visible { outline-color: var(--rain); }
+
+.artist-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0; }
+.artist-name { flex: 1; min-width: 0; overflow-wrap: anywhere; font-family: var(--mincho); font-size: 17px; font-weight: 600; }
+.status { font-size: 13px; color: var(--muted); }
+.status-saved { color: var(--accent); font-weight: 700; }
+.on-paper .status { color: var(--ink-soft); }
+.on-paper .status-saved { color: var(--rain); }
+
+/* 「最新」の印：小さな紙の札 */
+.badge-latest {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--mincho);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+}
 
 .field { margin: 16px 0; }
 .label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 4px; }
@@ -122,8 +205,8 @@ input[type="text"], input[type="date"], textarea {
   position: fixed;
   left: 0; right: 0; bottom: 0;
   display: flex;
-  background: var(--surface);
-  border-top: 1px solid var(--line);
+  background: var(--night);
+  border-top: 1px solid var(--surface);
   padding-bottom: env(safe-area-inset-bottom);
 }
 #tabbar a {
@@ -136,6 +219,6 @@ input[type="text"], input[type="date"], textarea {
   text-decoration: none;
   font-size: 14px;
 }
-#tabbar a[aria-current="page"] { color: var(--accent); font-weight: 700; }
+#tabbar a[aria-current="page"] { color: var(--paper); font-weight: 700; }
 .artist-warn { flex-basis: 100%; margin: 0; font-size: 14px; }
 .artist-warn[hidden] { display: none; }
