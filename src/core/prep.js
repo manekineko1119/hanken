@@ -3,6 +3,7 @@ import { normalizeName, titleKey } from './normalize.js';
 // 検索した名前とそろえた名前が完全一致する候補がちょうど1つのときだけ返す。
 export function pickArtist(query, candidates) {
   const q = normalizeName(query);
+  if (!q) return null;
   const hits = candidates.filter((c) => normalizeName(c.name) === q);
   return hits.length === 1 ? hits[0] : null;
 }
@@ -60,9 +61,11 @@ export function buildInitialTracks(cands, artistName, n = 10) {
 
 // 曲を消して、使っていない候補から次を足す（設計 4.3 の 4）。
 export function replaceTrack(tracks, rest, index, artistName) {
+  if (!Number.isInteger(index) || index < 0 || index >= tracks.length) return { tracks, rest };
   const removed = tracks[index];
   const kept = tracks.filter((_, i) => i !== index);
   const used = new Set(kept.map((t) => titleKey(t.title)));
+  used.add(titleKey(removed.title)); // 消した曲を、すぐ次の候補として出し直さない
   const popular = rest.popular.filter((c) => !used.has(titleKey(c.title)));
   const recent = rest.recent.filter((c) => !used.has(titleKey(c.title)));
 

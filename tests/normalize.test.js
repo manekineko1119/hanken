@@ -38,3 +38,9 @@ test('isExcludedTitle: 残す曲', () => {
     assert.equal(isExcludedTitle(t), false, t);
   }
 });
+
+test('isExcludedTitle: Live のあとに続きがある形・曲名の一部の Live', () => {
+  assert.equal(isExcludedTitle('A - Live at X'), true);
+  assert.equal(isExcludedTitle('A - Live Ver.'), true);
+  assert.equal(isExcludedTitle('Long Live'), false);
+});
