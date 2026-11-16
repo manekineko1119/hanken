@@ -1,5 +1,5 @@
 begin;
-select plan(30);
+select plan(33);
 
 -- ---------- 準備（postgres）----------
 insert into auth.users (id, email) values
@@ -19,6 +19,17 @@ insert into public.playlists (id, user_id, kind, live_id, live_artist_id, artist
 insert into public.playlist_tracks (id, playlist_id, user_id, title, artist_name) values
   ('44444444-0000-0000-0000-000000000001', '33333333-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1', 'A track', 'A artist 1');
 
+-- B 自身のデータ（B が自分の行だけ見える・触れることの確認用）
+insert into public.lives (id, user_id, date, title) values
+  ('11111111-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000b1', '2026-12-03', 'B live');
+insert into public.live_artists (id, live_id, user_id, name) values
+  ('22222222-0000-0000-0000-0000000000b1', '11111111-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000b1', 'B artist');
+insert into public.playlists (id, user_id, kind, live_id, live_artist_id, artist_name, title) values
+  ('33333333-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000b1', 'setlist',
+   '11111111-0000-0000-0000-0000000000b1', '22222222-0000-0000-0000-0000000000b1', 'B artist', 'B playlist');
+insert into public.playlist_tracks (id, playlist_id, user_id, title, artist_name) values
+  ('44444444-0000-0000-0000-0000000000b1', '33333333-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000b1', 'B track', 'B artist');
+
 -- ---------- CHECK 制約（postgres）----------
 select throws_ok(
   $$insert into public.playlist_tracks (playlist_id, user_id, title, artist_name, video_id)
@@ -37,30 +48,39 @@ select lives_ok(
 set local role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', '00000000-0000-0000-0000-0000000000b1', 'email', 'b@example.test', 'role', 'authenticated')::text, true);
 
-select is_empty($$select * from public.lives$$, 'B は A の lives を見られない');
-select is_empty($$select * from public.live_artists$$, 'B は A の live_artists を見られない');
-select is_empty($$select * from public.playlists$$, 'B は A の playlists を見られない');
-select is_empty($$select * from public.playlist_tracks$$, 'B は A の playlist_tracks を見られない');
+select results_eq($$select id from public.lives$$, $$values ('11111111-0000-0000-0000-0000000000b1'::uuid)$$, 'B は lives で自分の行だけ見える（A の行は見えない）');
+select results_eq($$select id from public.live_artists$$, $$values ('22222222-0000-0000-0000-0000000000b1'::uuid)$$, 'B は live_artists で自分の行だけ見える（A の行は見えない）');
+select results_eq($$select id from public.playlists$$, $$values ('33333333-0000-0000-0000-0000000000b1'::uuid)$$, 'B は playlists で自分の行だけ見える（A の行は見えない）');
+select results_eq($$select id from public.playlist_tracks$$, $$values ('44444444-0000-0000-0000-0000000000b1'::uuid)$$, 'B は playlist_tracks で自分の行だけ見える（A の行は見えない）');
 
-select is_empty($$with u as (update public.lives set title = 'hack' returning 1) select * from u$$, 'B は A の lives を更新できない（0行）');
-select is_empty($$with u as (update public.live_artists set name = 'hack' returning 1) select * from u$$, 'B は A の live_artists を更新できない（0行）');
-select is_empty($$with u as (update public.playlists set title = 'hack' returning 1) select * from u$$, 'B は A の playlists を更新できない（0行）');
-select is_empty($$with u as (update public.playlist_tracks set title = 'hack' returning 1) select * from u$$, 'B は A の playlist_tracks を更新できない（0行）');
+select results_eq($$with u as (update public.lives set title = 'edited' returning id) select id from u$$, $$values ('11111111-0000-0000-0000-0000000000b1'::uuid)$$, 'B の update は B 自身の lives の行だけに効く');
+select results_eq($$with u as (update public.live_artists set name = 'edited' returning id) select id from u$$, $$values ('22222222-0000-0000-0000-0000000000b1'::uuid)$$, 'B の update は B 自身の live_artists の行だけに効く');
+select results_eq($$with u as (update public.playlists set title = 'edited' returning id) select id from u$$, $$values ('33333333-0000-0000-0000-0000000000b1'::uuid)$$, 'B の update は B 自身の playlists の行だけに効く');
+select results_eq($$with u as (update public.playlist_tracks set title = 'edited' returning id) select id from u$$, $$values ('44444444-0000-0000-0000-0000000000b1'::uuid)$$, 'B の update は B 自身の playlist_tracks の行だけに効く');
 
-select is_empty($$with d as (delete from public.lives returning 1) select * from d$$, 'B は A の lives を削除できない（0行）');
-select is_empty($$with d as (delete from public.live_artists returning 1) select * from d$$, 'B は A の live_artists を削除できない（0行）');
-select is_empty($$with d as (delete from public.playlists returning 1) select * from d$$, 'B は A の playlists を削除できない（0行）');
-select is_empty($$with d as (delete from public.playlist_tracks returning 1) select * from d$$, 'B は A の playlist_tracks を削除できない（0行）');
+select results_eq($$with d as (delete from public.playlist_tracks returning id) select id from d$$, $$values ('44444444-0000-0000-0000-0000000000b1'::uuid)$$, 'B の delete は B 自身の playlist_tracks の行だけに効く');
+select results_eq($$with d as (delete from public.playlists returning id) select id from d$$, $$values ('33333333-0000-0000-0000-0000000000b1'::uuid)$$, 'B の delete は B 自身の playlists の行だけに効く');
+select results_eq($$with d as (delete from public.live_artists returning id) select id from d$$, $$values ('22222222-0000-0000-0000-0000000000b1'::uuid)$$, 'B の delete は B 自身の live_artists の行だけに効く');
+select results_eq($$with d as (delete from public.lives returning id) select id from d$$, $$values ('11111111-0000-0000-0000-0000000000b1'::uuid)$$, 'B の delete は B 自身の lives の行だけに効く');
 
 select throws_ok(
   $$insert into public.lives (user_id, date) values ('00000000-0000-0000-0000-0000000000a1', '2026-12-31')$$,
   '42501', null, 'B は A の user_id で lives を作れない');
+select throws_ok(
+  $$insert into public.playlists (user_id, kind, artist_name, title) values ('00000000-0000-0000-0000-0000000000a1', 'prep', 'x', 'x')$$,
+  '42501', null, 'B は A の user_id で playlists を作れない');
 select throws_ok(
   $$insert into public.live_artists (live_id, user_id, name) values ('11111111-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000b1', 'x')$$,
   '42501', null, 'B は自分の user_id でも A の live に live_artists をぶら下げられない');
 select throws_ok(
   $$insert into public.playlist_tracks (playlist_id, user_id, title, artist_name) values ('33333333-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000b1', 'x', 'x')$$,
   '42501', null, 'B は A の playlist に曲をぶら下げられない');
+select throws_ok(
+  $$insert into public.live_artists (live_id, user_id, name) values ('11111111-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1', 'x')$$,
+  '42501', null, 'B は A の user_id で live_artists を作れない');
+select throws_ok(
+  $$insert into public.playlist_tracks (playlist_id, user_id, title, artist_name) values ('33333333-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1', 'x', 'x')$$,
+  '42501', null, 'B は A の user_id で playlist_tracks を作れない');
 
 -- ---------- A として ----------
 reset role;
