@@ -1,9 +1,14 @@
 import { el, backLink, loadView } from '../ui/dom.js';
 import { getLive, getPlaylistStatuses, deleteLive } from '../data/lives.js';
-import { formatDateJa } from '../core/lives.js';
+import { formatDateJa, liveHeading } from '../core/lives.js';
 
 const STATUS_LABEL = { none: '未作成', draft: '下書き', saved: '保存済み' };
 const DELETE_CONFIRM = 'このライブを消しますか？アプリの中の予習の記録も消えます。YouTube 上のプレイリストは消えません。';
+
+// null・undefined・空白だけは空にする（「null」を画面に出さない）。
+function text(v) {
+  return typeof v === 'string' ? v.trim() : '';
+}
 
 function artistRow(artist, index, statuses) {
   const prep = statuses.get(artist.id)?.prep ?? 'none';
@@ -49,9 +54,9 @@ export function renderLiveDetail(container, ctx) {
       del.addEventListener('click', () => onDelete(live, container, del, ctx));
       container.replaceChildren(
         backLink('#/lives', '一覧へ'),
-        el('h1', { text: live.title || formatDateJa(live.date) }),
-        el('p', { class: 'meta', text: formatDateJa(live.date) + (live.venue ? `　${live.venue}` : '') }),
-        live.memo ? el('p', { class: 'memo', text: live.memo }) : null,
+        el('h1', { text: liveHeading(live) }),
+        el('p', { class: 'meta', text: formatDateJa(live.date) + (text(live.venue) ? `　${text(live.venue)}` : '') }),
+        text(live.memo) ? el('p', { class: 'memo', text: live.memo }) : null,
         el('h2', { text: '出演者' }),
         el('ul', { class: 'list' }, ...live.artists.map((a, i) => artistRow(a, i, statuses))),
         el('div', { class: 'actions' }, el('a', { class: 'button', href: `#/live/${encodeURIComponent(live.id)}/edit`, text: '編集' }), del),

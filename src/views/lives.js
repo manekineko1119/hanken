@@ -1,9 +1,9 @@
 import { el, loadView } from '../ui/dom.js';
 import { listLives } from '../data/lives.js';
-import { splitLives, todayJst, formatDateJa } from '../core/lives.js';
+import { splitLives, todayJst, formatDateJa, liveHeading } from '../core/lives.js';
 
 function row(live) {
-  const title = live.title || live.artists.map((a) => a.name).join('、') || '（無題）';
+  const title = liveHeading(live);
   return el(
     'li',
     {},
@@ -12,7 +12,7 @@ function row(live) {
       { class: 'row', href: `#/live/${encodeURIComponent(live.id)}` },
       el('span', { class: 'row-date', text: formatDateJa(live.date) }),
       el('span', { class: 'row-title', text: title }),
-      live.venue ? el('span', { class: 'row-sub', text: live.venue }) : null,
+      typeof live.venue === 'string' && live.venue.trim() ? el('span', { class: 'row-sub', text: live.venue }) : null,
     ),
   );
 }

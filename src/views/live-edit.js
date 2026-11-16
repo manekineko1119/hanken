@@ -29,8 +29,11 @@ function toPayload(state) {
   return { live: { id: state.id, date: state.date, venue: orNull(state.venue), title: orNull(state.title), memo: orNull(state.memo) }, artists };
 }
 
+// label の for と input の id でつなぐ（名前のない入力欄を作らない）。
 function field(label, input, errorText) {
-  return el('div', { class: 'field' }, el('label', {}, el('span', { class: 'label', text: label }), input), errorText ? el('p', { class: 'note error', role: 'alert', text: errorText }) : null);
+  const id = `f-${label}`;
+  input.id = id;
+  return el('div', { class: 'field' }, el('label', { for: id, class: 'label', text: label }), input, errorText ? el('p', { class: 'note error', role: 'alert', text: errorText }) : null);
 }
 
 function bind(input, state, key) {

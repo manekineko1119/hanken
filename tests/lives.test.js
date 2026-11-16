@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { todayJst, splitLives, formatDateJa } from '../src/core/lives.js';
+import { todayJst, splitLives, formatDateJa, liveHeading } from '../src/core/lives.js';
 import { pickConfig } from '../src/config.js';
 
 test('todayJst：UTC の夜は日本では翌日', () => {
@@ -51,4 +51,19 @@ test('formatDateJa：うるう日と不正な値', () => {
   assert.equal(formatDateJa(''), '');
   assert.equal(formatDateJa(null), '');
   assert.equal(formatDateJa('abc'), 'abc');
+});
+
+test('liveHeading：タイトルがあればそれ（前後の空白は除く）', () => {
+  assert.equal(liveHeading({ title: '  春の対バン ', date: '2026-12-01', artists: [{ name: 'A', position: 0 }] }), '春の対バン');
+});
+
+test('liveHeading：タイトルがなければ出演者を position 順に「、」でつなぐ', () => {
+  const live = { title: null, date: '2026-12-01', artists: [{ name: 'B', position: 1 }, { name: 'A', position: 0 }] };
+  assert.equal(liveHeading(live), 'A、B');
+  assert.equal(liveHeading({ ...live, title: '   ' }), 'A、B');
+});
+
+test('liveHeading：どちらもなければ日付', () => {
+  assert.equal(liveHeading({ title: null, date: '2026-12-01', artists: [] }), '2026/12/01（火）');
+  assert.equal(liveHeading({ date: '2026-12-01' }), '2026/12/01（火）');
 });
