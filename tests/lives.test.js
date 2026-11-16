@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { todayJst, splitLives } from '../src/core/lives.js';
+import { todayJst, splitLives, formatDateJa } from '../src/core/lives.js';
 import { pickConfig } from '../src/config.js';
 
 test('todayJst：UTC の夜は日本では翌日', () => {
@@ -38,4 +38,17 @@ test('pickConfig：localhost と 127.0.0.1 はローカルの Supabase', () => {
 test('pickConfig：ほかのホストは空（本番の値はデプロイ時に入れる）', () => {
   assert.deepEqual(pickConfig('example.github.io'), { url: '', key: '' });
   assert.deepEqual(pickConfig(undefined), { url: '', key: '' });
+});
+
+test('formatDateJa：YYYY/MM/DD と曜日', () => {
+  assert.equal(formatDateJa('2026-12-01'), '2026/12/01（火）');
+  assert.equal(formatDateJa('2026-11-15'), '2026/11/15（日）');
+  assert.equal(formatDateJa('2027-01-01'), '2027/01/01（金）');
+});
+
+test('formatDateJa：うるう日と不正な値', () => {
+  assert.equal(formatDateJa('2028-02-29'), '2028/02/29（火）');
+  assert.equal(formatDateJa(''), '');
+  assert.equal(formatDateJa(null), '');
+  assert.equal(formatDateJa('abc'), 'abc');
 });

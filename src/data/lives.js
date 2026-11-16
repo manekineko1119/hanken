@@ -62,3 +62,20 @@ export async function saveLive(live, artists) {
 export async function deleteLive(id) {
   check(await getClient().from('lives').delete().eq('id', id));
 }
+
+// 出演者ごとの予習・セトリの状態。行がなければ 'none'。
+export async function getPlaylistStatuses(liveId) {
+  const { data, error } = await getClient()
+    .from('playlists')
+    .select('live_artist_id, kind, status')
+    .eq('live_id', liveId);
+  if (error) throw error;
+  const map = new Map();
+  for (const r of data) {
+    if (!r.live_artist_id) continue;
+    const cur = map.get(r.live_artist_id) ?? { prep: 'none', setlist: 'none' };
+    if (r.kind === 'prep' || r.kind === 'setlist') cur[r.kind] = r.status;
+    map.set(r.live_artist_id, cur);
+  }
+  return map;
+}

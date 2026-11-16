@@ -2,8 +2,26 @@ import { parseHash } from './router.js';
 import { readAuthReturn, pickReturnTo, resolveAllowed } from './core/auth-url.js';
 import { getAuthState, checkAllowed, signIn, signOut, RETURN_TO_KEY } from './auth/auth.js';
 import { renderLogin } from './views/login.js';
+import { renderTabbar } from './views/tabbar.js';
+import { renderLives } from './views/lives.js';
+import { renderLiveDetail } from './views/live-detail.js';
+import { renderLiveEdit } from './views/live-edit.js';
+import { renderPrep, renderSettings } from './views/placeholder.js';
+import { el } from './ui/dom.js';
 
 const main = document.querySelector('main');
+const tabbar = document.querySelector('#tabbar');
+const appHeader = document.querySelector('#app-header');
+let renderId = 0;
+
+const VIEWS = {
+  '/lives': renderLives,
+  '/live/new': renderLiveEdit,
+  '/live/:id/edit': renderLiveEdit,
+  '/live/:id': renderLiveDetail,
+  '/prep': renderPrep,
+  '/settings': renderSettings,
+};
 let authState = 'unknown';
 let denied = false;
 let starting = false;
@@ -35,11 +53,23 @@ async function onSignIn() {
 }
 
 function render() {
+  const current = ++renderId;
+  appHeader.hidden = authState !== 'signedIn';
   if (authState !== 'signedIn') {
+    renderTabbar(tabbar, { visible: false });
     renderLogin(main, { denied, unknown: authState === 'unknown', startFailed, onSignIn });
     return;
   }
-  main.textContent = parseHash(location.hash).path;
+  const route = parseHash(location.hash);
+  renderTabbar(tabbar, { visible: true, path: route.path });
+  const view = VIEWS[route.path];
+  if (!view) {
+    // まだ作っていない画面は、一覧へ戻す導線だけ出す。
+    main.replaceChildren(el('p', { class: 'note', text: '準備中です' }), el('a', { class: 'back', href: '#/lives', text: 'ライブの一覧へ' }));
+    return;
+  }
+  window.scrollTo(0, 0);
+  view(main, { params: route.params, query: route.query, alive: () => current === renderId });
 }
 
 async function start() {
