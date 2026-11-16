@@ -6,7 +6,10 @@ import { renderTabbar } from './views/tabbar.js';
 import { renderLives } from './views/lives.js';
 import { renderLiveDetail } from './views/live-detail.js';
 import { renderLiveEdit } from './views/live-edit.js';
-import { renderPrep, renderSettings } from './views/placeholder.js';
+import { renderSettings } from './views/placeholder.js';
+import { renderPrep } from './views/prep-list.js';
+import { renderArtistPick } from './views/artist-pick.js';
+import { renderPlaylistEdit } from './views/playlist-edit.js';
 import { el, setChildren } from './ui/dom.js';
 
 const main = document.querySelector('main');
@@ -19,6 +22,8 @@ const VIEWS = {
   '/live/new': renderLiveEdit,
   '/live/:id/edit': renderLiveEdit,
   '/live/:id': renderLiveDetail,
+  '/artist-pick': renderArtistPick,
+  '/playlist/:id': renderPlaylistEdit,
   '/prep': renderPrep,
   '/settings': renderSettings,
 };

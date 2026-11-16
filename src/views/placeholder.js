@@ -1,10 +1,6 @@
 import { el, setChildren } from '../ui/dom.js';
 import { signOut } from '../auth/auth.js';
 
-export function renderPrep(container) {
-  setChildren(container, el('h1', { text: '予習だけ' }), el('p', { class: 'note', text: '準備中です' }));
-}
-
 export function renderSettings(container, ctx) {
   const msg = el('p', { class: 'note error', role: 'alert', hidden: true });
   const out = el('button', { type: 'button', text: 'ログアウト' });

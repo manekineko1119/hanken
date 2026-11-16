@@ -1,0 +1,66 @@
+// プレイリストの保存・読み込み（Supabase）。薄く保つ。判断は src/core/ に置く。
+import { getClient } from '../auth/auth.js';
+
+const trackRow = (playlistId, t, i) => ({
+  playlist_id: playlistId, position: i, title: t.title, artist_name: t.artistName,
+  source: t.source, is_latest: !!t.isLatest,
+});
+
+const fromRow = (r) => ({ title: r.title, artistName: r.artist_name, source: r.source, isLatest: r.is_latest });
+
+function check({ error }) {
+  if (error) throw error;
+}
+
+export async function createPrepDraft({ liveId, liveArtistId, artistName, itunesArtistId, tracks, rest, title }) {
+  const db = getClient();
+  const { data, error } = await db.from('playlists').insert({
+    kind: 'prep', status: 'draft', live_id: liveId ?? null, live_artist_id: liveArtistId ?? null,
+    artist_name: artistName, itunes_artist_id: itunesArtistId ?? null, title, candidates: rest,
+  }).select('id').single();
+  if (error) throw error;
+  try {
+    if (tracks.length) check(await db.from('playlist_tracks').insert(tracks.map((t, i) => trackRow(data.id, t, i))));
+  } catch (err) {
+    await db.from('playlists').delete().eq('id', data.id);
+    throw err;
+  }
+  return data.id;
+}
+
+export async function getPlaylist(id) {
+  const db = getClient();
+  const { data, error } = await db.from('playlists')
+    .select('id, kind, live_id, live_artist_id, artist_name, itunes_artist_id, title, status, candidates')
+    .eq('id', id).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const res = await db.from('playlist_tracks')
+    .select('title, artist_name, source, is_latest, position').eq('playlist_id', id).order('position', { ascending: true });
+  if (res.error) throw res.error;
+  return { ...data, tracks: res.data.map(fromRow) };
+}
+
+// 曲を入れ替える（曲に子はないので、消して入れ直す）。使っていない候補も更新する。
+export async function saveTracks(id, tracks, rest) {
+  const db = getClient();
+  check(await db.from('playlists').update({ candidates: rest }).eq('id', id));
+  check(await db.from('playlist_tracks').delete().eq('playlist_id', id));
+  if (tracks.length) check(await db.from('playlist_tracks').insert(tracks.map((t, i) => trackRow(id, t, i))));
+}
+
+export async function listPrepOnly() {
+  const { data, error } = await getClient().from('playlists')
+    .select('id, title, tracks:playlist_tracks(count)')
+    .eq('kind', 'prep').is('live_id', null).order('created_at', { ascending: false });
+  if (error) throw error;
+  return data.map((p) => ({ id: p.id, title: p.title, count: p.tracks?.[0]?.count ?? 0 }));
+}
+
+// ライブの出演者ごとの予習の id（なければ入っていない）。
+export async function getPrepIds(liveId) {
+  const { data, error } = await getClient().from('playlists')
+    .select('id, live_artist_id').eq('live_id', liveId).eq('kind', 'prep');
+  if (error) throw error;
+  return new Map(data.filter((r) => r.live_artist_id).map((r) => [r.live_artist_id, r.id]));
+}

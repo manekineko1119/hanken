@@ -96,3 +96,32 @@ export function replaceTrack(tracks, rest, index, artistName) {
     : [...kept.slice(0, latestAt), added, ...kept.slice(latestAt)];
   return { tracks: out, rest: nextRest };
 }
+
+// 人気の順のデータがあったか（Last.fm の曲が入っている、または人気の候補が残っている）。
+export function hasPopularity(tracks, rest) {
+  return tracks.some((t) => t.source === 'lastfm') || (rest?.popular?.length ?? 0) > 0;
+}
+
+// 1つ上・下へ動かす。最新の枠は最後のまま（動かせず、その下へも動かせない）。
+export function moveTrack(tracks, index, dir) {
+  const to = dir === 'up' ? index - 1 : index + 1;
+  if (!Number.isInteger(index) || index < 0 || index >= tracks.length) return tracks;
+  if (to < 0 || to >= tracks.length) return tracks;
+  if (tracks[index].isLatest || tracks[to].isLatest) return tracks;
+  const out = tracks.slice();
+  [out[index], out[to]] = [out[to], out[index]];
+  return out;
+}
+
+// 曲名を打ち込んで足す。最新の枠の前に入れる。空・重複は { tracks（そのまま）, duplicate }。
+export function addManualTrack(tracks, title, artistName) {
+  const t = String(title ?? '').trim();
+  if (!t) return { tracks, duplicate: false };
+  const key = titleKey(t);
+  if (tracks.some((x) => titleKey(x.title) === key)) return { tracks, duplicate: true };
+  const added = { title: t, artistName, source: 'manual', isLatest: false };
+  const latestAt = tracks.findIndex((x) => x.isLatest);
+  const out = latestAt === -1 ? [...tracks, added]
+    : [...tracks.slice(0, latestAt), added, ...tracks.slice(latestAt)];
+  return { tracks: out, duplicate: false };
+}
