@@ -1,6 +1,6 @@
 import { parseHash } from './router.js';
-import { readAuthReturn, pickReturnTo } from './core/auth-url.js';
-import { getAuthState, signIn, RETURN_TO_KEY } from './auth/auth.js';
+import { readAuthReturn, pickReturnTo, resolveAllowed } from './core/auth-url.js';
+import { getAuthState, checkAllowed, signIn, signOut, RETURN_TO_KEY } from './auth/auth.js';
 import { renderLogin } from './views/login.js';
 
 const main = document.querySelector('main');
@@ -47,6 +47,16 @@ async function start() {
   denied = ret.denied;
   // 先に状態を確かめる（Supabase が URL の code を読み終えてから URL を直す）。
   authState = await getAuthState({ hadCode: ret.code !== null, denied });
+  if (authState === 'signedIn') {
+    // 許可リストから外された人は、ログインできていても止める。
+    const { allowed, error } = await checkAllowed();
+    const r = resolveAllowed({ state: authState, allowed, allowedError: error });
+    authState = r.state;
+    if (r.denied) {
+      denied = true;
+      await signOut();
+    }
+  }
   history.replaceState(null, '', ret.cleanUrl);
 
   if (authState === 'signedOut') {

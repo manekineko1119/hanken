@@ -69,3 +69,25 @@ export async function signOut() {
     return { ok: false };
   }
 }
+
+// ログイン後に、許可リストに入っているかをサーバーで確かめる。3秒で打ち切り、失敗は error（拒否扱いにしない）。
+export async function checkAllowed() {
+  let timer;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve({ allowed: null, error: new Error('timeout') }), TIMEOUT_MS);
+  });
+  const check = (async () => {
+    try {
+      const { data, error } = await getClient().rpc('am_i_allowed');
+      if (error) return { allowed: null, error };
+      return typeof data === 'boolean' ? { allowed: data, error: null } : { allowed: null, error: new Error('bad response') };
+    } catch (error) {
+      return { allowed: null, error };
+    }
+  })();
+  try {
+    return await Promise.race([check, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
