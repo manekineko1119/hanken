@@ -33,7 +33,8 @@ create table public.playlist_tracks (
   is_latest boolean not null default false,
   video_id text,
   video_title text,
-  video_checked_at timestamptz
+  video_checked_at timestamptz,
+  constraint playlist_tracks_video_checked check (video_id is null or video_checked_at is not null)
 );
 create index playlist_tracks_user_id_idx on public.playlist_tracks(user_id);
 create index playlist_tracks_playlist_id_idx on public.playlist_tracks(playlist_id);
@@ -50,14 +51,16 @@ create policy playlists_insert on public.playlists for insert to authenticated
   with check (
     user_id = (select auth.uid()) and (select private.is_allowed())
     and (live_id is null or exists (select 1 from public.lives l where l.id = live_id and l.user_id = (select auth.uid())))
-    and (live_artist_id is null or exists (select 1 from public.live_artists a where a.id = live_artist_id and a.user_id = (select auth.uid())))
+    and (live_artist_id is null or exists (select 1 from public.live_artists a where a.id = live_artist_id and a.user_id = (select auth.uid())
+      and (playlists.live_id is null or a.live_id = playlists.live_id)))
   );
 create policy playlists_update on public.playlists for update to authenticated
   using (user_id = (select auth.uid()) and (select private.is_allowed()))
   with check (
     user_id = (select auth.uid()) and (select private.is_allowed())
     and (live_id is null or exists (select 1 from public.lives l where l.id = live_id and l.user_id = (select auth.uid())))
-    and (live_artist_id is null or exists (select 1 from public.live_artists a where a.id = live_artist_id and a.user_id = (select auth.uid())))
+    and (live_artist_id is null or exists (select 1 from public.live_artists a where a.id = live_artist_id and a.user_id = (select auth.uid())
+      and (playlists.live_id is null or a.live_id = playlists.live_id)))
   );
 create policy playlists_delete on public.playlists for delete to authenticated
   using (user_id = (select auth.uid()) and (select private.is_allowed()));

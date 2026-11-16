@@ -6,7 +6,7 @@ grant usage on schema private to authenticated;
 -- 許可リスト（招待した人のメール）。後続の RLS が private.is_allowed() を使うので、ここで先に作る。
 -- 実在のメールはここに書かない（公開リポジトリ）。
 create table public.allowed_emails (
-  email text primary key check (email = lower(email)),
+  email text primary key check (email = lower(trim(email))),
   note text,
   created_at timestamptz not null default now()
 );
