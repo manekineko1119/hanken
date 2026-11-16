@@ -14,10 +14,12 @@ npm test
 ## ローカルで開く
 
 ```powershell
-python -m http.server 8080 --bind 127.0.0.1
+python scripts/serve.py
 ```
 
-ブラウザで http://127.0.0.1:8080/ を開く。
+ブラウザで http://localhost:8080/ を開く（Google ログインの戻り先が localhost のため）。
+
+`python -m http.server` は使わない。Windows の Python は `.mjs` を `text/plain` で返すので、ブラウザがプログラムを動かさず、画面が空になる。`scripts/serve.py` は `.js`・`.mjs` を JavaScript として返す。
 
 ## 補足
 
