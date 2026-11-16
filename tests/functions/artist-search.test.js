@@ -68,3 +68,9 @@ test('iTunes が 500・通信エラーなら 502 UPSTREAM', async () => {
     assert.equal((await res.json()).error.code, 'UPSTREAM');
   }
 });
+
+test('APP_ORIGIN の末尾の / は無視して比べる', async () => {
+  const { deps } = makeDeps({ env: { APP_ORIGIN: 'https://app.example/' } });
+  const res = await handle(new Request('http://fn/x', { method: 'OPTIONS', headers: { Origin: 'https://app.example' } }), deps);
+  assert.equal(res.headers.get('Access-Control-Allow-Origin'), 'https://app.example');
+});

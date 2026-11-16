@@ -14,7 +14,7 @@ export async function handle(req, deps) {
   const url = `https://itunes.apple.com/search?term=${encodeURIComponent(name)}&entity=musicArtist&country=JP&limit=10`;
   let data;
   try {
-    const res = await deps.fetch(url);
+    const res = await deps.fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`status ${res.status}`);
     data = await res.json();
   } catch {
