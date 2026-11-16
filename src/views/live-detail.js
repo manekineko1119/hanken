@@ -1,4 +1,4 @@
-import { el, backLink, loadView } from '../ui/dom.js';
+import { el, backLink, loadView, setChildren, appendChildren } from '../ui/dom.js';
 import { getLive, getPlaylistStatuses, deleteLive } from '../data/lives.js';
 import { formatDateJa, liveHeading } from '../core/lives.js';
 
@@ -32,7 +32,7 @@ async function onDelete(live, container, button, ctx) {
     if (!ctx.alive()) return;
     button.disabled = false;
     container.querySelector('.delete-error')?.remove();
-    container.append(el('p', { class: 'note error delete-error', role: 'alert', text: '消せませんでした。通信を確かめて、もう一度押してください' }));
+    appendChildren(container, el('p', { class: 'note error delete-error', role: 'alert', text: '消せませんでした。通信を確かめて、もう一度押してください' }));
   }
 }
 
@@ -47,12 +47,12 @@ export function renderLiveDetail(container, ctx) {
     },
     ({ live, statuses }) => {
       if (!live) {
-        container.replaceChildren(backLink('#/lives', '一覧へ'), el('p', { class: 'note', text: 'このライブは見つかりませんでした' }));
+        setChildren(container, backLink('#/lives', '一覧へ'), el('p', { class: 'note', text: 'このライブは見つかりませんでした' }));
         return;
       }
       const del = el('button', { type: 'button', class: 'danger', text: '削除' });
       del.addEventListener('click', () => onDelete(live, container, del, ctx));
-      container.replaceChildren(
+      setChildren(container,
         backLink('#/lives', '一覧へ'),
         el('h1', { text: liveHeading(live) }),
         el('p', { class: 'meta', text: formatDateJa(live.date) + (text(live.venue) ? `　${text(live.venue)}` : '') }),

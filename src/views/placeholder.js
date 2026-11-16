@@ -1,8 +1,8 @@
-import { el } from '../ui/dom.js';
+import { el, setChildren } from '../ui/dom.js';
 import { signOut } from '../auth/auth.js';
 
 export function renderPrep(container) {
-  container.replaceChildren(el('h1', { text: '予習だけ' }), el('p', { class: 'note', text: '準備中です' }));
+  setChildren(container, el('h1', { text: '予習だけ' }), el('p', { class: 'note', text: '準備中です' }));
 }
 
 export function renderSettings(container, ctx) {
@@ -26,5 +26,5 @@ export function renderSettings(container, ctx) {
     msg.textContent = 'ログアウトできませんでした（通信できません）';
     msg.hidden = false;
   });
-  container.replaceChildren(el('h1', { text: '設定' }), el('p', { class: 'note', text: '準備中です' }), out, msg);
+  setChildren(container, el('h1', { text: '設定' }), el('p', { class: 'note', text: '準備中です' }), out, msg);
 }
