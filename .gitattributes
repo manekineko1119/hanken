@@ -1,0 +1,11 @@
+# 改行コードは LF に統一する（Windows で編集しても CRLF にしない）
+* text=auto eol=lf
+
+# vendor はバイトを変えない（SHA-256 をテストで確かめるため）
+vendor/* -text
+
+# バイナリ
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
