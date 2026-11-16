@@ -1,5 +1,4 @@
 import { el, setChildren, backLink } from '../ui/dom.js';
-import { setArtistItunesId } from '../data/lives.js';
 import { loadContext, createFor, orderedCandidates, NOT_FOUND } from './prep-flow.js';
 
 export async function renderArtistPick(container, ctx) {
@@ -33,7 +32,6 @@ export async function renderArtistPick(container, ctx) {
       msg.hidden = true;
       try {
         const id = await createFor(c, cand.id);
-        if (c.liveArtistId) await setArtistItunesId(c.liveArtistId, cand.id).catch(() => {}); // 覚えられなくても作れている
         if (ctx.alive()) location.hash = `#/playlist/${encodeURIComponent(id)}`;
       } catch (err) {
         if (!ctx.alive()) return;

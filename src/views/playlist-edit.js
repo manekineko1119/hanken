@@ -4,7 +4,7 @@ import { replaceTrack, moveTrack, addManualTrack, hasPopularity } from '../core/
 
 const SAVE_FAILED = '保存できませんでした。通信を確かめてください';
 
-function trackRow(t, i, last, on) {
+function trackRow(t, i, tracks, on) {
   const btn = (label, fn, disabled) => {
     const b = el('button', { type: 'button', text: label, disabled });
     b.addEventListener('click', fn);
@@ -12,10 +12,10 @@ function trackRow(t, i, last, on) {
   };
   return el('li', { class: 'artist-row' },
     el('span', { class: 'artist-name', text: `${i + 1}. ${t.title}` }),
-    t.isLatest ? el('span', { class: 'status status-saved', text: '最新' }) : null,
+    t.isLatest ? el('span', { class: 'status status-saved badge-latest', text: '最新' }) : null,
     btn('消す', () => on.remove(i)),
     btn('↑', () => on.move(i, 'up'), i === 0 || t.isLatest),
-    btn('↓', () => on.move(i, 'down'), i === last || t.isLatest));
+    btn('↓', () => on.move(i, 'down'), i === tracks.length - 1 || t.isLatest || tracks[i + 1]?.isLatest));
 }
 
 export function renderPlaylistEdit(container, ctx) {
@@ -32,29 +32,26 @@ export function renderPlaylistEdit(container, ctx) {
     let busy = false;
     const input = el('input', { type: 'text', maxlength: '100', placeholder: '曲名', 'aria-label': '足す曲名' });
 
+    // 成功なら true。失敗したら変更前（prev）に戻してエラーを出す（サーバーの状態には頼らない。保存は丸ごと入れ替えなので、失敗なら元のまま）。
     const persist = async (next, nextRest) => {
-      if (busy) return;
+      if (busy) return false;
       busy = true;
       const prev = { tracks, rest };
       tracks = next;
       rest = nextRest;
       message = '';
       draw();
+      let ok = true;
       try {
         await saveTracks(id, tracks, rest);
       } catch {
-        try {
-          const fresh = await getPlaylist(id);
-          if (!fresh) throw new Error('missing');
-          tracks = fresh.tracks;
-          rest = fresh.candidates ?? { popular: [], recent: [] };
-        } catch {
-          ({ tracks, rest } = prev);
-        }
+        ({ tracks, rest } = prev);
         message = SAVE_FAILED;
+        ok = false;
       }
       busy = false;
       if (ctx.alive()) draw();
+      return ok;
     };
 
     const on = {
@@ -68,12 +65,11 @@ export function renderPlaylistEdit(container, ctx) {
       },
     };
 
-    const add = () => {
+    const add = async () => {
       const r = addManualTrack(tracks, input.value, pl.artist_name);
       if (r.duplicate) { message = '同じ曲がもう入っています'; draw(); return; }
       if (r.tracks === tracks) return;
-      input.value = '';
-      persist(r.tracks, rest);
+      if (await persist(r.tracks, rest)) input.value = '';
     };
     const addBtn = el('button', { type: 'button', text: '足す' });
     addBtn.addEventListener('click', add);
@@ -85,7 +81,7 @@ export function renderPlaylistEdit(container, ctx) {
         backLink(back, '戻る'),
         el('h1', { text: pl.title }),
         !hasPopularity(tracks, rest) ? el('p', { class: 'note', text: '人気の順のデータがないため、新しい順です' }) : null,
-        el('ul', { class: 'list' }, ...tracks.map((t, i) => trackRow(t, i, tracks.length - 1, on))),
+        el('ul', { class: 'list' }, ...tracks.map((t, i) => trackRow(t, i, tracks, on))),
         tracks.length < 10 ? el('p', { class: 'note', text: '候補がもうありません。曲名で探して足せます' }) : null,
         message ? el('p', { class: 'note error', role: 'alert', text: message }) : null,
         el('div', { class: 'artist-edit' }, input, addBtn),

@@ -41,12 +41,15 @@ export async function getPlaylist(id) {
   return { ...data, tracks: res.data.map(fromRow) };
 }
 
-// 曲を入れ替える（曲に子はないので、消して入れ直す）。使っていない候補も更新する。
+// 曲を丸ごと入れ替える。DB の関数が1つのトランザクションで行う（途中で失敗しても元のまま）。
 export async function saveTracks(id, tracks, rest) {
-  const db = getClient();
-  check(await db.from('playlists').update({ candidates: rest }).eq('id', id));
-  check(await db.from('playlist_tracks').delete().eq('playlist_id', id));
-  if (tracks.length) check(await db.from('playlist_tracks').insert(tracks.map((t, i) => trackRow(id, t, i))));
+  check(await getClient().rpc('replace_playlist_tracks', {
+    p_playlist_id: id,
+    p_tracks: tracks.map((t, i) => ({
+      position: i, title: t.title, artist_name: t.artistName, source: t.source, is_latest: !!t.isLatest,
+    })),
+    p_candidates: rest,
+  }));
 }
 
 export async function listPrepOnly() {
