@@ -25,3 +25,14 @@ export function formatDateJa(date) {
   const dow = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay();
   return `${m[1]}/${m[2]}/${m[3]}（${WEEKDAYS[dow]}）`;
 }
+
+// 画面の見出し：タイトル → 出演者（position 順、「、」つなぎ）→ 日付。
+export function liveHeading(live) {
+  const title = typeof live?.title === 'string' ? live.title.trim() : '';
+  if (title) return title;
+  const names = [...(live?.artists ?? [])]
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .map((a) => String(a?.name ?? '').trim())
+    .filter(Boolean);
+  return names.length ? names.join('、') : formatDateJa(live?.date);
+}
