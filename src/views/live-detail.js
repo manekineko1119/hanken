@@ -17,13 +17,14 @@ function artistRow(artist, index, statuses) {
   );
 }
 
-async function onDelete(live, container, button) {
+async function onDelete(live, container, button, ctx) {
   if (!confirm(DELETE_CONFIRM)) return;
   button.disabled = true;
   try {
     await deleteLive(live.id);
-    location.hash = '#/lives';
+    if (ctx.alive()) location.hash = '#/lives';
   } catch {
+    if (!ctx.alive()) return;
     button.disabled = false;
     container.querySelector('.delete-error')?.remove();
     container.append(el('p', { class: 'note error delete-error', role: 'alert', text: '消せませんでした。通信を確かめて、もう一度押してください' }));
@@ -45,7 +46,7 @@ export function renderLiveDetail(container, ctx) {
         return;
       }
       const del = el('button', { type: 'button', class: 'danger', text: '削除' });
-      del.addEventListener('click', () => onDelete(live, container, del));
+      del.addEventListener('click', () => onDelete(live, container, del, ctx));
       container.replaceChildren(
         backLink('#/lives', '一覧へ'),
         el('h1', { text: live.title || formatDateJa(live.date) }),
