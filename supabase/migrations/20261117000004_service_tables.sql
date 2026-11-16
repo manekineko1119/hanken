@@ -71,7 +71,7 @@ begin
   return query
     select true, c.channel_title, c.connected_at
     from public.youtube_connections c
-    where c.user_id = (select auth.uid());
+    where c.user_id = (select auth.uid()) and (select private.is_allowed());
   if not found then
     return query select false, null::text, null::timestamptz;
   end if;
