@@ -74,7 +74,7 @@ test('2回目：今の項目を全部消してから入れ直す', async () => {
     if (url.includes('/playlistItems') && m === 'DELETE') return { status: 204, body: null };
     return null;
   });
-  const { deps, reqs, db } = await setup({ tracks: [trk(1), trk(2)], playlist: { youtube_playlist_id: 'OLD', status: 'saved' }, router });
+  const { deps, reqs, db } = await setup({ tracks: [trk(1), trk(2)], playlist: { youtube_playlist_id: 'OLD', status: 'saved', title: '半券：バンドA' }, router });
   const j = await (await call(deps)).json();
   assert.deepEqual(yt(reqs), ['GET playlistItems', 'DELETE playlistItems', 'DELETE playlistItems', 'POST playlistItems', 'POST playlistItems']);
   assert.equal(new URL(reqs[0].url).searchParams.get('playlistId'), 'OLD');
@@ -95,7 +95,7 @@ test('項目が50件を超えるときは、次のページも取って消す', 
     if (m === 'DELETE') return { status: 204, body: null };
     return null;
   });
-  const { deps, reqs } = await setup({ tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD' }, router });
+  const { deps, reqs } = await setup({ tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD', title: '半券：バンドA' }, router });
   await call(deps);
   assert.deepEqual(yt(reqs), ['GET playlistItems', 'GET playlistItems', 'DELETE playlistItems', 'DELETE playlistItems', 'POST playlistItems']);
 });
@@ -229,7 +229,7 @@ test('作り直し：YouTube に残っている本当の項目数で枠を確か
   });
   // 下書きは1曲だけ（見積もり 101）。でも YouTube には5つ残っている（見積もり 301）。
   const { deps, reqs, db } = await setup({
-    tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD', status: 'saved' }, router,
+    tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD', status: 'saved', title: '半券：バンドA' }, router,
     tables: { api_usage: [{ day_pt: '2026-11-16', units: 9300, searches: 0 }] },
   });
   const res = await call(deps);
@@ -248,7 +248,7 @@ test('作り直し：残りの項目が多くても、枠に入るなら消し�
     if (m === 'DELETE') return { status: 204, body: null };
     return null;
   });
-  const { deps, db } = await setup({ tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD' }, router });
+  const { deps, db } = await setup({ tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD', title: '半券：バンドA' }, router });
   assert.equal((await call(deps)).status, 200);
   assert.equal(db.tables.api_usage[0].units, 1 + 150 + 50);
 });
@@ -275,4 +275,103 @@ test('途中で YouTube が 401 を返したら YT_RECONNECT（inserted を添�
   assert.equal(j.error.code, 'YT_RECONNECT');
   assert.equal(j.inserted, 1);
   assert.equal(db.tables.api_usage[0].units, 150);
+});
+
+// ---- 同時保存の排他（鍵） ----
+const lockOf = (db) => db.tables.playlists[0].save_locked_until;
+
+test('保存の前に鍵を取り（YouTube を呼ぶ前）、終わったら外す', async () => {
+  const { deps, db, reqs } = await setup({ tracks: [trk(1)], router: happy() });
+  const f = deps.fetch;
+  let claimedBeforeFirstCall = false;
+  deps.fetch = async (...a) => {
+    claimedBeforeFirstCall ||= db.lockCalls.some((c) => c.name === 'claim_playlist_save');
+    return f(...a);
+  };
+  const res = await call(deps);
+  assert.equal(res.status, 200);
+  assert.equal(claimedBeforeFirstCall, true);
+  assert.deepEqual(db.lockCalls.map((c) => c.name), ['claim_playlist_save', 'release_playlist_save']);
+  assert.deepEqual(
+    { id: db.lockCalls[0].p_playlist_id, user: db.lockCalls[0].p_user_id, sec: db.lockCalls[0].p_seconds },
+    { id: PL, user: 'u1', sec: 120 },
+  );
+  assert.equal(lockOf(db), null);
+  assert.ok(reqs.length > 0);
+});
+
+test('鍵が取れない（保存中）：409 BUSY。YouTube も回数も使わず、他の人の鍵は外さない', async () => {
+  const locked = new Date(Date.now() + 60000).toISOString();
+  const { deps, db, reqs } = await setup({ tracks: [trk(1)], playlist: { save_locked_until: locked }, router: happy() });
+  const res = await call(deps);
+  assert.equal(res.status, 409);
+  const j = await res.json();
+  assert.equal(j.error.code, 'BUSY');
+  assert.equal(j.error.message, '保存中です。少し待ってからもう一度押してください');
+  assert.equal(reqs.length, 0);
+  assert.equal(db.tables.user_daily_usage, undefined);
+  assert.deepEqual(db.lockCalls.map((c) => c.name), ['claim_playlist_save']);
+  assert.equal(lockOf(db), locked);
+});
+
+test('失敗しても鍵を外す（YouTube のエラー）', async () => {
+  const router = happy((url, init) => (url.includes('/playlists') && (init.method ?? 'GET') === 'POST' ? { status: 500, body: {} } : null));
+  const { deps, db } = await setup({ tracks: [trk(1)], router });
+  const res = await call(deps);
+  assert.equal(res.status, 502);
+  assert.equal(lockOf(db), null);
+  assert.equal(db.lockCalls.at(-1).name, 'release_playlist_save');
+});
+
+test('鍵の取得そのものが失敗：502（YouTube は呼ばない・外す鍵もない）', async () => {
+  const { deps, db, reqs } = await setup({ tracks: [trk(1)], router: happy() });
+  const rpc = db.rpc.bind(db);
+  db.rpc = async (name, a) => (name === 'claim_playlist_save' ? { data: null, error: { message: 'boom' } } : rpc(name, a));
+  const res = await call(deps);
+  assert.equal(res.status, 502);
+  assert.equal(reqs.length, 0);
+  assert.equal(db.lockCalls.length, 0);
+});
+
+// ---- 名前の更新・保存 ----
+const existing = (extra = () => null) => happy((url, init) => {
+  const m = init.method ?? 'GET';
+  if (url.includes('/playlistItems') && m === 'GET') return ok({ items: [{ id: 'i1' }] });
+  if (url.includes('/playlistItems') && m === 'DELETE') return { status: 204, body: null };
+  if (url.includes('/playlists') && m === 'PUT') return ok({ id: 'OLD' });
+  return extra(url, init);
+});
+
+test('再保存で名前が変わっていたら、YouTube の名前も更新する（part=snippet・50単位を見積もりに足す）', async () => {
+  const { deps, reqs, db } = await setup({ tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD', status: 'saved', title: '前の名前' }, router: existing() });
+  const res = await call(deps, { playlistId: PL, title: '新しい名前' });
+  assert.equal(res.status, 200);
+  assert.deepEqual(yt(reqs), ['GET playlistItems', 'PUT playlists', 'DELETE playlistItems', 'POST playlistItems']);
+  const put = reqs[1];
+  assert.equal(new URL(put.url).searchParams.get('part'), 'snippet');
+  assert.deepEqual(put.body, { id: 'OLD', snippet: { title: '新しい名前' } });
+  // 単位：list 1 + 項目1件の削除 50 + 追加 50 + 名前の更新 50 = 151
+  assert.equal(db.tables.api_usage[0].units, 151);
+});
+
+test('再保存で名前が同じなら、名前の更新はしない', async () => {
+  const { deps, reqs, db } = await setup({ tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD', status: 'saved', title: '同じ' }, router: existing() });
+  await call(deps, { playlistId: PL, title: '同じ' });
+  assert.ok(!yt(reqs).includes('PUT playlists'));
+  assert.equal(db.tables.api_usage[0].units, 101);
+});
+
+test('名前の更新が失敗したら、曲を消す前に止まる（UPSTREAM）', async () => {
+  const router = existing();
+  const wrapped = (url, init = {}) => (url.includes('/playlists') && init.method === 'PUT' ? { status: 500, body: {} } : router(url, init));
+  const { deps, reqs } = await setup({ tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD', status: 'saved', title: '前' }, router: wrapped });
+  const res = await call(deps, { playlistId: PL, title: '新' });
+  assert.equal(res.status, 502);
+  assert.ok(!yt(reqs).includes('DELETE playlistItems'));
+});
+
+test('成功したら、実際に使った名前を playlists.title に保存する', async () => {
+  const { deps, db } = await setup({ tracks: [trk(1)], router: happy() });
+  await call(deps, { playlistId: PL, title: '  変えた名前  ' });
+  assert.equal(db.tables.playlists[0].title, '変えた名前');
 });
