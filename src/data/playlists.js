@@ -6,7 +6,7 @@ const trackRow = (playlistId, t, i) => ({
   source: t.source, is_latest: !!t.isLatest,
 });
 
-const fromRow = (r) => ({ title: r.title, artistName: r.artist_name, source: r.source, isLatest: r.is_latest });
+const fromRow = (r) => ({ id: r.id, title: r.title, artistName: r.artist_name, source: r.source, isLatest: r.is_latest });
 
 function check({ error }) {
   if (error) throw error;
@@ -36,7 +36,7 @@ export async function getPlaylist(id) {
   if (error) throw error;
   if (!data) return null;
   const res = await db.from('playlist_tracks')
-    .select('title, artist_name, source, is_latest, position').eq('playlist_id', id).order('position', { ascending: true });
+    .select('id, title, artist_name, source, is_latest, position').eq('playlist_id', id).order('position', { ascending: true });
   if (res.error) throw res.error;
   return { ...data, tracks: res.data.map(fromRow) };
 }
@@ -66,4 +66,30 @@ export async function getPrepIds(liveId) {
     .select('id, live_artist_id').eq('live_id', liveId).eq('kind', 'prep');
   if (error) throw error;
   return new Map(data.filter((r) => r.live_artist_id).map((r) => [r.live_artist_id, r.id]));
+}
+
+// Edge Function を呼ぶ。失敗したら { code, message, ...本文のそのほか } を持つ Error を投げる（本文が読めなければ code なし）。
+async function callFunction(name, body) {
+  let res;
+  try {
+    res = await getClient().functions.invoke(name, { body });
+  } catch (e) {
+    res = { error: e };
+  }
+  if (!res.error) return res.data;
+  let payload = null;
+  try { payload = await res.error.context?.json?.(); } catch { payload = null; }
+  const { error: info, ...rest } = payload && typeof payload === 'object' ? payload : {};
+  throw Object.assign(new Error(info?.message ?? 'FUNCTION_FAILED'), { ...rest, code: info?.code, message: info?.message ?? 'FUNCTION_FAILED' });
+}
+
+// 曲ごとに YouTube Music の曲を探す。{ tracks: [{ id, videoId, videoTitle }], searchesLeft }。
+// 枠切れ（QUOTA）は、ここまでの結果を持つ Error（e.tracks）で返る。
+export function resolveVideos(playlistId) {
+  return callFunction('yt-resolve-videos', { playlistId });
+}
+
+// YouTube に非公開で保存する。{ youtubePlaylistId, url, inserted, skipped }。
+export function savePlaylist(playlistId, title) {
+  return callFunction('yt-save-playlist', { playlistId, title });
 }

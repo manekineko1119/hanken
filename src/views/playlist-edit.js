@@ -1,5 +1,8 @@
 import { el, setChildren, backLink, loadView } from '../ui/dom.js';
 import { getPlaylist, saveTracks } from '../data/playlists.js';
+import { renderPlaylistConfirm } from './playlist-confirm.js';
+import { getStatus, connect } from '../data/youtube.js';
+import { confirmReturnTo } from '../core/save-confirm.js';
 import { replaceTrack, moveTrack, addManualTrack, hasPopularity } from '../core/prep.js';
 
 const SAVE_FAILED = '保存できませんでした。通信を確かめてください';
@@ -20,6 +23,7 @@ function trackRow(t, i, tracks, on) {
 
 export function renderPlaylistEdit(container, ctx) {
   const id = ctx.params.id;
+  if (ctx.query?.confirm === '1') { renderPlaylistConfirm(container, ctx); return; }
   loadView(container, ctx, () => getPlaylist(id), (pl) => {
     if (!pl || pl.kind !== 'prep') {
       setChildren(container, backLink('#/prep', '戻る'), el('p', { class: 'note', text: 'このプレイリストは見つかりませんでした' }));
@@ -74,9 +78,33 @@ export function renderPlaylistEdit(container, ctx) {
     const addBtn = el('button', { type: 'button', text: '足す' });
     addBtn.addEventListener('click', add);
 
+    // つながっていれば確認の画面へ。つながっていなければ、つないでから確認の画面へ戻る。
+    async function goSave() {
+      if (busy) return;
+      busy = true;
+      message = '';
+      draw();
+      try {
+        const { connected } = await getStatus();
+        if (!ctx.alive()) return;
+        if (connected) {
+          busy = false;
+          location.hash = confirmReturnTo(id);
+          return;
+        }
+        await connect(confirmReturnTo(id));
+      } catch {
+        if (!ctx.alive()) return;
+        busy = false;
+        message = 'YouTube の状態を確かめられませんでした。通信を確かめてください';
+        draw();
+      }
+    }
+
     function draw() {
       const typed = input.value;
-      const save = el('button', { type: 'button', class: 'primary', disabled: true, text: 'YouTube Music に保存（準備中）' });
+      const save = el('button', { type: 'button', class: 'primary', disabled: busy || tracks.length === 0, text: 'YouTube Music に保存' });
+      save.addEventListener('click', goSave);
       setChildren(container,
         backLink(back, '戻る'),
         el('h1', { text: pl.title }),
