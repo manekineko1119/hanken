@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1d1c1a">
+  <title>プライバシーポリシー - 半券</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="./src/ui/styles/app.css">
+</head>
+<body>
+  <main>
+    <a class="back" href="./">半券に戻る</a>
+    <h1>プライバシーポリシー</h1>
+    <p class="note">「半券」（LIVE TICKET STUB）は、招待した人だけが使う、ライブの記録と予習プレイリストのアプリです。このページは、アプリが何を取り、どう使い、いつ消すかを書いています。</p>
+
+    <h2>取るデータ</h2>
+    <ul>
+      <li>Google アカウントの名前とメールアドレス（ログインと、招待した人かどうかの確認に使います）。</li>
+      <li>YouTube のチャンネル名（設定の画面に「どのチャンネルにつながっているか」を出すために使います）。</li>
+      <li>YouTube につなぐための鍵（トークン）。暗号化して保存し、ブラウザからは読めません。</li>
+      <li>あなたが登録したライブ（日付・会場・ライブ名・メモ・出演者）、プレイリストと曲の記録、見つけた YouTube の動画の ID とタイトル。</li>
+    </ul>
+
+    <h2>使い方</h2>
+    <ul>
+      <li>上のデータは、このアプリの機能（ログイン、ライブの記録、予習プレイリストの作成、YouTube Music への保存）のためだけに使います。広告には使わず、売ったり、ほかの人に渡したりしません。</li>
+      <li>YouTube の権限（youtube）は、「YouTube Music に保存」を押したときだけ求めます。あなたの YouTube にプレイリストを作る・中身を入れ替えるためにだけ使い、ほかのデータは読み書きしません。</li>
+      <li>アーティスト名と曲名は、曲の候補を探すために、iTunes Search API、Last.fm、YouTube Data API に送ります。メールアドレスなどは送りません。</li>
+      <li>データは Supabase（データベースのサービス）に置いています。自分のデータは、自分だけが読み書きできるようにしています。</li>
+      <li>半券による Google の API から得た情報の利用は、<a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API サービスのユーザーデータに関するポリシー</a>（限定的使用の要件を含む）に従います。YouTube の API サービスを使うため、<a href="https://www.youtube.com/t/terms" rel="noopener">YouTube 利用規約</a>と <a href="https://policies.google.com/privacy" rel="noopener">Google のプライバシーポリシー</a>も適用されます。</li>
+    </ul>
+
+    <h2>保存する期間</h2>
+    <ul>
+      <li>YouTube から取ったデータ（動画の ID・タイトルなど）は、最長30日までしか保存しません。30日を過ぎたものは、確かめ直すか、消します。</li>
+      <li>YouTube の鍵とチャンネル名は、つないでいる間だけ保存します。切断すると、すぐに消します。</li>
+      <li>ライブ・プレイリストの記録は、あなたが消すまで保存します。ライブを消すと、アプリの中のそのプレイリストの記録も消えます。YouTube にすでに作ったプレイリストは消えないので、YouTube Music で自分で消してください。</li>
+    </ul>
+
+    <h2>取り消し方</h2>
+    <ul>
+      <li>アプリの「設定」の画面で、YouTube との接続を切断できます。切断すると、保存していた鍵をすぐに消し、Google 側の許可も取り消します。</li>
+      <li>Google のアカウントの画面からも、いつでも取り消せます：<a href="https://myaccount.google.com/permissions" rel="noopener">https://myaccount.google.com/permissions</a>（「半券」を選んで、アクセスを削除します）。</li>
+      <li>記録のすべてを消したいときは、下の連絡先に伝えてください。</li>
+    </ul>
+
+    <h2>連絡先</h2>
+    <p>このアプリを紹介した人（あなたを招待した人）に、直接連絡してください。</p>
+
+    <p><a href="./">半券に戻る</a></p>
+  </main>
+</body>
+</html>
