@@ -52,3 +52,9 @@ export function normalizePref(v) {
     text: typeof o.text === 'string' ? o.text.slice(0, 100) : '',
   };
 }
+
+// プレイリストを消す前の確認の文。消すのはアプリの記録だけ（YouTube 上のプレイリストは消さない）。
+export function deleteConfirmText({ title, youtubePlaylistId }) {
+  const head = `「${title}」を消しますか？消すと元に戻せません。`;
+  return youtubePlaylistId ? `${head}YouTube に保存したプレイリストは残ります（消したいときは YouTube で消してください）。` : head;
+}
