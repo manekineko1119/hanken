@@ -4,8 +4,8 @@ import { renderPlaylistConfirm } from './playlist-confirm.js';
 import { getStatus, connect } from '../data/youtube.js';
 import { confirmReturnTo } from '../core/save-confirm.js';
 import { needsReflect } from '../core/playlist-list.js';
-import { moveTrackTo } from '../core/reorder.js';
-import { attachDrag } from '../ui/drag-reorder.js';
+import { moveTrackTo, maxDropIndex } from '../core/reorder.js';
+import { attachDrag, cancelActiveDrag } from '../ui/drag-reorder.js';
 import { replaceTrack, moveTrack, addManualTrack, hasPopularity } from '../core/prep.js';
 
 const SAVE_FAILED = '保存できませんでした。通信を確かめてください';
@@ -29,7 +29,7 @@ function trackRow(t, i, tracks, on, editing, busy) {
     if (e.key === 'ArrowUp') { e.preventDefault(); on.move(i, 'up'); }
     if (e.key === 'ArrowDown') { e.preventDefault(); on.move(i, 'down'); }
   });
-  const li = el('li', { class: 'artist-row' },
+  const li = el('li', { class: 'artist-row editing' },
     handle,
     el('span', { class: 'artist-name', text: `${i + 1}. ${t.title}` }),
     btn('↑', `${t.title} を上へ`, () => on.move(i, 'up'), busy || i === 0 || t.isLatest),
@@ -52,14 +52,15 @@ export function renderPlaylistEdit(container, ctx) {
     let message = '';
     let busy = false;
     let editing = false;
-    let focusIdx = null; // 動かしたあと、つまみにフォーカスを戻す行
+    // 作り直したあとにフォーカスを戻す先：{ i: 行, role: 'handle' | 'del' } か 'toggle'
+    let focusTo = null;
     // 保存済みで、保存のあとに曲を変えたら、YouTube Music にまだ反映していない。
     let unreflected = needsReflect({ status: pl.status, savedAt: pl.saved_at, editedAt: pl.edited_at });
     const input = el('input', { type: 'text', maxlength: '100', placeholder: '曲名', 'aria-label': '足す曲名' });
 
     // 成功なら true。失敗したら変更前（prev）に戻してエラーを出す（サーバーの状態には頼らない。保存は丸ごと入れ替えなので、失敗なら元のまま）。
-    const persist = async (next, nextRest) => {
-      if (busy) { focusIdx = null; return false; }
+    const persist = async (next, nextRest, focus = {}) => {
+      if (busy) { focusTo = null; return false; }
       busy = true;
       const prev = { tracks, rest };
       tracks = next;
@@ -76,19 +77,22 @@ export function renderPlaylistEdit(container, ctx) {
         ok = false;
       }
       busy = false;
+      focusTo = (ok ? focus.ok : focus.fail) ?? null;
       if (ctx.alive()) draw();
-      focusIdx = null;
+      focusTo = null;
       return ok;
     };
 
     const on = {
       remove: (i) => {
         const r = replaceTrack(tracks, rest, i, pl.artist_name);
-        persist(r.tracks, r.rest);
+        // 消したあと：同じ場所に次の曲が入るので、その行の「消す」へ。失敗したら元の行の「消す」へ。
+        const at = { i: Math.min(i, r.tracks.length - 1), role: 'del' };
+        persist(r.tracks, r.rest, { ok: at, fail: { i, role: 'del' } });
       },
       move: (i, dir) => {
         const next = moveTrack(tracks, i, dir);
-        if (next !== tracks) { focusIdx = i + (dir === 'up' ? -1 : 1); persist(next, rest); }
+        if (next !== tracks) persist(next, rest, { ok: { i: i + (dir === 'up' ? -1 : 1), role: 'handle' }, fail: { i, role: 'handle' } });
       },
       drop: (from, to) => {
         const next = moveTrackTo(tracks, from, to);
@@ -131,20 +135,23 @@ export function renderPlaylistEdit(container, ctx) {
     function draw() {
       const typed = input.value;
       const list = el('ul', { class: 'list' });
-      const latestAt = tracks.findIndex((t) => t.isLatest);
-      const lastMovable = latestAt === -1 ? tracks.length - 1 : latestAt - 1;
+      cancelActiveDrag();
+      const maxIndex = maxDropIndex(tracks);
       tracks.forEach((t, i) => {
         const r = trackRow(t, i, tracks, on, editing, busy);
         if (r.li) {
           list.append(r.li);
-          attachDrag(r.handle, r.li, list, { from: i, maxIndex: lastMovable, onDrop: on.drop });
-          if (focusIdx === i) queueMicrotask(() => r.handle.focus());
+          attachDrag(r.handle, r.li, list, { from: i, maxIndex, onDrop: on.drop });
+          if (focusTo && focusTo.i === i) {
+            const target = focusTo.role === 'del' ? r.li.querySelector('.danger') : r.handle;
+            queueMicrotask(() => target.focus());
+          }
         } else {
           list.append(r);
         }
       });
       const toggle = el('button', { type: 'button', text: editing ? '完了' : '編集', disabled: !editing && tracks.length === 0 });
-      toggle.addEventListener('click', () => { editing = !editing; focusIdx = null; draw(); });
+      toggle.addEventListener('click', () => { editing = !editing; focusTo = 'toggle'; draw(); focusTo = null; });
       const save = el('button', { type: 'button', class: 'primary', disabled: busy || tracks.length === 0, text: pl.status === 'saved' ? 'YouTube Music に反映' : 'YouTube Music に保存' });
       save.addEventListener('click', goSave);
       setChildren(container,
@@ -158,6 +165,7 @@ export function renderPlaylistEdit(container, ctx) {
         el('div', { class: 'artist-edit' }, input, addBtn),
         el('div', { class: 'actions' }, save, toggle));
       input.value = typed;
+      if (focusTo === 'toggle') toggle.focus();
     }
     draw();
   });

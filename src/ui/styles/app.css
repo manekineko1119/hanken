@@ -232,3 +232,9 @@ select {
 .dragging-list { overscroll-behavior: contain; }
 .dragging-list > li:not(.dragging) { transition: transform 0.12s; }
 .artist-row.dragging { position: relative; z-index: 2; background: var(--surface); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5); cursor: grabbing; }
+
+/* 編集モードの行：1行に収める。ボタンは細くして、押せる高さ（44px）は保つ */
+.artist-row.editing { flex-wrap: nowrap; gap: 4px; }
+.artist-row.editing .artist-name { flex: 1 1 auto; min-width: 0; }
+.artist-row.editing button { flex: none; min-width: 40px; padding: 0 6px; }
+.artist-row.editing .handle { min-width: 40px; }
