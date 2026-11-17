@@ -29,8 +29,11 @@ export function filterPlaylists(items, { status = 'all', text = '' } = {}) {
 
 // 保存済みで、保存のあとに曲を変えた（YouTube Music にまだ反映していない）か。
 export function needsReflect({ status, savedAt, editedAt }) {
-  if (status !== 'saved' || !editedAt) return false;
-  return !savedAt || editedAt > savedAt;
+  if (status !== 'saved') return false;
+  const edited = Date.parse(editedAt);
+  if (Number.isNaN(edited)) return false;
+  const saved = Date.parse(savedAt);
+  return Number.isNaN(saved) || edited > saved;
 }
 
 export function youtubeMusicUrl(youtubePlaylistId) {
