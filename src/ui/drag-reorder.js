@@ -1,9 +1,15 @@
 // ≡ のつまみを引きずって、リストの行を並べ替える（Pointer Events。HTML5 の drag and drop は使わない）。
 // つまみは touch-action: none（CSS）。行そのものは普通にスクロールできる。
-import { dropIndex } from '../core/reorder.js';
+import { dropIndex, hasDragged, autoScrollDelta } from '../core/reorder.js';
 
 const EDGE = 64;   // 画面の端からこの近さで自動スクロール
 const SPEED = 12;  // 1フレームあたりの px
+
+// いま引きずっている最中の後始末（なければ null）。画面を作り直す前に cancelActiveDrag() で止める。
+let active = null;
+export function cancelActiveDrag() {
+  if (active) active(false);
+}
 
 // handle：つまみ、row：動く行、list：行の親。maxIndex：落とせる最後の場所。onDrop(from, to)：離したとき1回だけ呼ぶ。
 export function attachDrag(handle, row, list, { from, maxIndex, onDrop }) {
@@ -18,6 +24,8 @@ export function attachDrag(handle, row, list, { from, maxIndex, onDrop }) {
     let lastY = e.clientY;
     let to = from;
     let raf = 0;
+    let moved = false; // 押しただけでは、自動スクロールもしない
+    if (active) active(false);
     const pid = e.pointerId;
     try { handle.setPointerCapture(pid); } catch { /* 取れなくても続ける */ }
     row.classList.add('dragging');
@@ -36,15 +44,21 @@ export function attachDrag(handle, row, list, { from, maxIndex, onDrop }) {
       });
     };
     const tick = () => {
-      const h = window.innerHeight;
-      if (lastY < EDGE) window.scrollBy(0, -SPEED);
-      else if (lastY > h - EDGE) window.scrollBy(0, SPEED);
+      if (!handle.isConnected) { finish(false); return; }
+      const d = autoScrollDelta(lastY, window.innerHeight, EDGE, SPEED);
+      if (d) window.scrollBy(0, d);
       update();
       raf = requestAnimationFrame(tick);
     };
 
-    const onMove = (ev) => { if (ev.pointerId === pid) { lastY = ev.clientY; update(); } };
+    const onMove = (ev) => {
+      if (ev.pointerId !== pid) return;
+      lastY = ev.clientY;
+      if (!moved && hasDragged(startY, lastY)) { moved = true; raf = requestAnimationFrame(tick); }
+      if (moved) update();
+    };
     const finish = (drop) => {
+      active = null;
       cancelAnimationFrame(raf);
       handle.removeEventListener('pointermove', onMove);
       handle.removeEventListener('pointerup', onUp);
@@ -62,6 +76,6 @@ export function attachDrag(handle, row, list, { from, maxIndex, onDrop }) {
     handle.addEventListener('pointerup', onUp);
     handle.addEventListener('pointercancel', onCancel);
     handle.addEventListener('lostpointercapture', onCancel);
-    raf = requestAnimationFrame(tick);
+    active = finish;
   });
 }
