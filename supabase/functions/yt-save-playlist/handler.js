@@ -37,12 +37,11 @@ export async function handle(req, deps) {
   const safeIncrement = async (opts) => {
     try { await incrementUsage(deps.db, user.id, now, { kind: 'save', ...opts }); } catch { /* 記録の失敗は無視 */ }
   };
-  // 何も呼ばないまま止めるとき：足した分を全部戻す
+  // 止めるとき：本人の回数を戻し、単位は実際に使った分だけ残す（何も呼んでいなければ全部戻る）
   const refundAll = async () => {
     if (userCounted) await safeIncrement({ searches: -1 });
-    if (reserved) await safeIncrement({ units: -reserved });
     userCounted = false;
-    reserved = 0;
+    await settle();
   };
   // 見積もりと実際の差を記録する（成功でも失敗でも）
   const settle = async () => {
@@ -70,6 +69,7 @@ export async function handle(req, deps) {
     try { return (await res.json())?.error?.errors?.[0]?.reason ?? null; } catch { return null; }
   };
   const failed = async (res, what) => {
+    if (res.status === 401) return coded('YT_RECONNECT', 'YouTube の許可が切れました。つなぎ直してください');
     if (res.status === 403 && (await readReason(res)) === 'quotaExceeded') {
       return coded('QUOTA', '今日の YouTube の枠がいっぱいになりました。日本時間の17時ごろ（冬は17時、夏は16時）に戻ります');
     }
@@ -100,9 +100,26 @@ export async function handle(req, deps) {
       return fail('QUOTA', `今日は保存できる回数を超えました（1日${LIMITS.save}回まで）`, 429);
     }
 
-    // YouTube の枠：見積もりを先に足して、9,500 を超えていたら戻す。
-    const rebuild = Boolean(playlist.youtube_playlist_id);
-    const estimate = estimateSaveUnits({ existingItems: rebuild ? playable.length : 0, count: playable.length, isNew: !rebuild });
+    let token;
+    token = await getAccessToken(deps.db, user.id, deps);
+
+    // 作り直し：まず今の項目を数える（list は1単位）。YouTube 側でプレイリストが消されていたら、新しく作る。
+    let ytId = playlist.youtube_playlist_id;
+    let ids = [];
+    if (ytId) {
+      let pageToken;
+      do {
+        const res = await yt('GET', 'playlistItems', { part: 'id', playlistId: ytId, maxResults: '50', ...(pageToken ? { pageToken } : {}) }, token, null, COST.list);
+        if (res.status === 404) { ytId = null; ids = []; break; }
+        if (!res.ok) throw await failed(res, '今の曲を確かめ');
+        const data = await res.json();
+        ids.push(...(data?.items ?? []).map((it) => it.id));
+        pageToken = data?.nextPageToken;
+      } while (pageToken);
+    }
+
+    // YouTube の枠：本当の項目数で見積もりを先に足して、9,500 を超えていたら戻す（消す前に止める）。
+    const estimate = estimateSaveUnits({ existingItems: ids.length, count: playable.length, isNew: !ytId });
     const u = await incrementUsage(deps.db, user.id, now, { kind: 'save', units: estimate });
     reserved = estimate;
     if (!canSpend(u.units - estimate, estimate)) {
@@ -110,36 +127,9 @@ export async function handle(req, deps) {
       return fail('QUOTA', '今日の YouTube の枠がいっぱいです。日本時間の17時ごろ（冬は17時、夏は16時）に戻ります', 429);
     }
 
-    let token;
-    try {
-      token = await getAccessToken(deps.db, user.id, deps);
-    } catch (e) {
-      await refundAll();
-      throw e;
-    }
-
-    // 作り直し：いまの項目を全部消す。YouTube 側でプレイリストが消されていたら、新しく作る。
-    let ytId = playlist.youtube_playlist_id;
-    if (ytId) {
-      const ids = [];
-      let pageToken;
-      let gone = false;
-      do {
-        const res = await yt('GET', 'playlistItems', { part: 'id', playlistId: ytId, maxResults: '50', ...(pageToken ? { pageToken } : {}) }, token, null, COST.list);
-        if (res.status === 404) { gone = true; break; }
-        if (!res.ok) throw await failed(res, '今の曲を確かめ');
-        const data = await res.json();
-        ids.push(...(data?.items ?? []).map((it) => it.id));
-        pageToken = data?.nextPageToken;
-      } while (pageToken);
-      if (gone) {
-        ytId = null;
-      } else {
-        for (const id of ids) {
-          const res = await yt('DELETE', 'playlistItems', { id }, token, null, COST.delete);
-          if (!res.ok && res.status !== 404) throw await failed(res, '今の曲を消');
-        }
-      }
+    for (const id of ids) {
+      const res = await yt('DELETE', 'playlistItems', { id }, token, null, COST.delete);
+      if (!res.ok && res.status !== 404) throw await failed(res, '今の曲を消');
     }
 
     if (!ytId) {
@@ -170,7 +160,8 @@ export async function handle(req, deps) {
       youtubePlaylistId: ytId, url: `https://music.youtube.com/playlist?list=${ytId}`, inserted, skipped,
     }, 200, origin, deps.env);
   } catch (e) {
-    await settle(); // 失敗でも、使った単位は記録に残す
+    // 失敗でも、使った単位は記録に残す。YouTube をまだ呼んでいなければ、回数も戻す。
+    if (spent === 0) await refundAll(); else await settle();
     const extra = { inserted, skipped };
     const send = (code, status) => json({ error: { code, message: e.message }, ...extra }, status, origin, deps.env);
     if (e?.code === 'YT_RECONNECT') return send('YT_RECONNECT', 403);
