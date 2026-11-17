@@ -35,9 +35,11 @@ test('pickConfig：localhost と 127.0.0.1 はローカルの Supabase', () => {
   assert.deepEqual(pickConfig('127.0.0.1'), local);
 });
 
-test('pickConfig：ほかのホストは空（本番の値はデプロイ時に入れる）', () => {
-  assert.deepEqual(pickConfig('example.github.io'), { url: '', key: '' });
-  assert.deepEqual(pickConfig(undefined), { url: '', key: '' });
+test('pickConfig：ほかのホスト（GitHub Pages）は本番の Supabase と publishable key', () => {
+  const prod = { url: 'https://zggkdnisdkspuwbelflo.supabase.co', key: 'sb_publishable_7_aem7wuSAl15JcUS1ikOw_3I6H5PUO' };
+  assert.deepEqual(pickConfig('manekineko1119.github.io'), prod);
+  assert.deepEqual(pickConfig(undefined), prod);
+  assert.doesNotMatch(prod.key, /secret/);
 });
 
 test('formatDateJa：YYYY/MM/DD と曜日', () => {

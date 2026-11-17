@@ -82,3 +82,17 @@ test('iTunes の results が配列でないなら 502 UPSTREAM', async () => {
     assert.equal(res.status, 502);
   }
 });
+
+test('APP_ORIGIN がサブパス付き（GitHub Pages）でも、オリジンの部分で比べる', async () => {
+  const { deps } = makeDeps({ env: { APP_ORIGIN: 'https://user.github.io/hanken' } });
+  const ok = await handle(new Request('http://fn/x', { method: 'OPTIONS', headers: { Origin: 'https://user.github.io' } }), deps);
+  assert.equal(ok.headers.get('Access-Control-Allow-Origin'), 'https://user.github.io');
+  const ng = await handle(new Request('http://fn/x', { method: 'OPTIONS', headers: { Origin: 'https://other.github.io' } }), deps);
+  assert.equal(ng.headers.get('Access-Control-Allow-Origin'), null);
+});
+
+test('APP_ORIGIN が URL として読めないときは、ローカル以外を許可しない', async () => {
+  const { deps } = makeDeps({ env: { APP_ORIGIN: 'not a url' } });
+  const res = await handle(new Request('http://fn/x', { method: 'OPTIONS', headers: { Origin: 'not a url' } }), deps);
+  assert.equal(res.headers.get('Access-Control-Allow-Origin'), null);
+});
