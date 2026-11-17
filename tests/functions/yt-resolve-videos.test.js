@@ -23,18 +23,18 @@ const searchCalls = (calls) => calls.filter((c) => c.includes('/youtube/v3/searc
 test('空の曲は検索して、選んだ動画を曲と video_cache に保存する', async () => {
   const { deps, calls, db } = makeDeps({
     env, tables: base([trk('t1', '曲1')]),
-    fetchMap: router({ search: searchItems(['a', 'ファン'], ['b', 'バンドA - Topic']) }),
+    fetchMap: router({ search: (() => { const s = searchItems(['a', 'ファン'], ['b', 'バンドA - Topic']); s.items.forEach((i) => { i.snippet.title = '曲1'; }); return s; })() }),
   });
   const res = await handle(post({ playlistId: PL }), deps);
   assert.equal(res.status, 200);
   const j = await res.json();
-  assert.deepEqual(j.tracks, [{ id: 't1', videoId: 'b', videoTitle: 'T-b' }]);
+  assert.deepEqual(j.tracks, [{ id: 't1', videoId: 'b', videoTitle: '曲1' }]);
   assert.equal(j.searchesLeft, 29);
   const url = new URL(searchCalls(calls)[0]);
   assert.equal(url.searchParams.get('q'), 'バンドA 曲1');
   assert.equal(url.searchParams.get('type'), 'video');
   assert.equal(url.searchParams.get('videoCategoryId'), '10');
-  assert.equal(url.searchParams.get('maxResults'), '5');
+  assert.equal(url.searchParams.get('maxResults'), '10');
   assert.equal(url.searchParams.get('regionCode'), 'JP');
   assert.equal(url.searchParams.get('key'), 'api-key');
   const row = db.tables.playlist_tracks[0];
@@ -84,7 +84,7 @@ test('30日を過ぎた曲は videos.list だけで確かめ、消えていた�
   });
   const j = await (await handle(post({ playlistId: PL }), deps)).json();
   const listCalls = calls.filter((c) => c.includes('/youtube/v3/videos'));
-  assert.equal(listCalls.length, 1);
+  assert.equal(listCalls.length, 2); // 確かめ直し1回 + 検索のあとの再生時間1回
   assert.equal(new URL(listCalls[0]).searchParams.get('id'), 'alive,gone');
   assert.equal(searchCalls(calls).length, 1);
   assert.deepEqual(j.tracks, [
@@ -92,7 +92,7 @@ test('30日を過ぎた曲は videos.list だけで確かめ、消えていた�
     { id: 't2', videoId: 'new2', videoTitle: 'T-new2' },
   ]);
   assert.equal(db.tables.playlist_tracks[0].video_checked_at, NOW.toISOString());
-  assert.equal(db.tables.api_usage[0].units, 1);
+  assert.equal(db.tables.api_usage[0].units, 2);
   assert.equal(db.tables.api_usage[0].searches, 1);
 });
 
@@ -257,4 +257,40 @@ test('videos.list は50件ずつに分ける', async () => {
   assert.deepEqual(listCalls.map((c) => new URL(c).searchParams.get('id').split(',').length), [50, 5]);
   assert.equal(db.tables.api_usage[0].units, 2);
   assert.equal(db.tables.api_usage[0].searches, 0);
+});
+
+test('検索のあと、videos.list（contentDetails）で再生時間を取り、1単位として数え、ショートを避ける', async () => {
+  const search = searchItems(['short', 'バンドA'], ['full', 'バンドA']);
+  search.items[0].snippet.title = '曲1';
+  search.items[1].snippet.title = '曲1';
+  const { deps, calls, db } = makeDeps({
+    env, tables: base([trk('t1', '曲1')]),
+    fetchMap: (url) => {
+      if (url.includes('/youtube/v3/search')) return { body: search };
+      if (url.includes('/youtube/v3/videos')) {
+        return { body: { items: [{ id: 'short', contentDetails: { duration: 'PT45S' } }, { id: 'full', contentDetails: { duration: 'PT4M33S' } }] } };
+      }
+      throw new Error('unexpected ' + url);
+    },
+  });
+  const j = await (await handle(post({ playlistId: PL }), deps)).json();
+  const d = calls.filter((c) => c.includes('/youtube/v3/videos'));
+  assert.equal(d.length, 1);
+  assert.equal(new URL(d[0]).searchParams.get('part'), 'contentDetails');
+  assert.equal(new URL(d[0]).searchParams.get('id'), 'short,full');
+  assert.equal(db.tables.api_usage[0].units, 1);
+  assert.equal(j.tracks[0].videoId, 'full');
+});
+
+test('再生時間を取れなくても、除かずに選ぶ', async () => {
+  const { deps } = makeDeps({
+    env, tables: base([trk('t1', '曲1')]),
+    fetchMap: (url) => {
+      if (url.includes('/youtube/v3/search')) return { body: searchItems(['a', 'ファン']) };
+      return { status: 500, body: {} };
+    },
+  });
+  const res = await handle(post({ playlistId: PL }), deps);
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).tracks[0].videoId, 'a');
 });

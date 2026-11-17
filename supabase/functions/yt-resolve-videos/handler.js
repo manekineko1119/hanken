@@ -19,7 +19,7 @@ function upstream(message) {
 async function searchVideos(deps, key, artist, title) {
   const qs = new URLSearchParams({
     part: 'snippet', q: `${artist} ${title}`, type: 'video', videoCategoryId: '10',
-    maxResults: '5', regionCode: 'JP', key,
+    maxResults: '10', regionCode: 'JP', key,
   });
   const res = await deps.fetch(`${API}/search?${qs}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!res.ok) throw upstream('YouTube で動画を探せませんでした');
@@ -27,6 +27,26 @@ async function searchVideos(deps, key, artist, title) {
   return (data?.items ?? [])
     .filter((it) => it?.id?.videoId)
     .map((it) => ({ videoId: it.id.videoId, title: it.snippet?.title ?? '', channelTitle: it.snippet?.channelTitle ?? '' }));
+}
+
+// ISO 8601 の長さ（PT4M33S など）を秒にする。読めなければ null。
+function parseDuration(iso) {
+  const m = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(String(iso ?? ''));
+  if (!m) return null;
+  return Number(m[1] ?? 0) * 86400 + Number(m[2] ?? 0) * 3600 + Number(m[3] ?? 0) * 60 + Number(m[4] ?? 0);
+}
+
+// 検索結果の再生時間を取る（1回1単位）。失敗したら空の Map（再生時間なしで選ぶ）。
+async function fetchDurations(deps, key, ids) {
+  try {
+    const qs = new URLSearchParams({ part: 'contentDetails', id: ids.join(','), key });
+    const res = await deps.fetch(`${API}/videos?${qs}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (!res.ok) return new Map();
+    const data = await res.json();
+    return new Map((data?.items ?? []).map((it) => [it.id, parseDuration(it.contentDetails?.duration)]));
+  } catch {
+    return new Map();
+  }
 }
 
 // 動画がまだあるかとタイトルを確かめる（50件まで1回）。戻り値：Map(videoId → title)。
@@ -122,7 +142,13 @@ export async function handle(req, deps) {
           quotaHit = over;
           continue;
         }
-        const picked = pickVideo(await searchVideos(deps, key, t.artist_name, t.title), t.artist_name);
+        const found = await searchVideos(deps, key, t.artist_name, t.title);
+        if (found.length > 0) {
+          userCount = (await incrementUsage(deps.db, user.id, now, { units: 1 })).user;
+          const durations = await fetchDurations(deps, key, found.map((f) => f.videoId));
+          for (const f of found) f.durationSec = durations.get(f.videoId) ?? undefined;
+        }
+        const picked = pickVideo(found, t.artist_name, t.title);
         hit = picked ? { videoId: picked.videoId, title: picked.title } : null;
         const up = await deps.db.from('video_cache').upsert({
           artist_key: aKey, title_key: tKey, video_id: hit?.videoId ?? null, video_title: hit?.title ?? null,
