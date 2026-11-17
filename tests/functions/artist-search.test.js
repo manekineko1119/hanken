@@ -74,3 +74,11 @@ test('APP_ORIGIN の末尾の / は無視して比べる', async () => {
   const res = await handle(new Request('http://fn/x', { method: 'OPTIONS', headers: { Origin: 'https://app.example' } }), deps);
   assert.equal(res.headers.get('Access-Control-Allow-Origin'), 'https://app.example');
 });
+
+test('iTunes の results が配列でないなら 502 UPSTREAM', async () => {
+  for (const b of [{ results: 'x' }, { results: {} }, {}, null]) {
+    const { deps } = makeDeps({ fetchMap: () => ({ body: b }) });
+    const res = await handle(post({ name: 'x' }), deps);
+    assert.equal(res.status, 502);
+  }
+});

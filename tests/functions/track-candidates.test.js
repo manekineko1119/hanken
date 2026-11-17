@@ -228,3 +228,44 @@ test('track_cache の読み書きエラーでも 200 を返す', async () => {
   const { deps } = makeDeps({ env, fetchMap: router(), errors: { track_cache: { code: 'XX000' } } });
   assert.equal((await handle(post(body), deps)).status, 200);
 });
+
+test('1回目 ok・2回目 500 なら 1回目の結果を短命（1日）で cache する', async () => {
+  const f = (url) => (url.includes('Aizora') ? { status: 500, body: {} } : router({ jp: lastfm('古い曲') })(url));
+  const { deps, db } = makeDeps({ env, fetchMap: f });
+  const j = await (await handle(post(body), deps)).json();
+  assert.deepEqual(j.popular.map((c) => c.title), ['古い曲']);
+  assert.equal(db.upserts.length, 1);
+  const row = db.upserts[0].row;
+  assert.equal(row.payload.partial, true);
+  const t = (age) => makeDeps({ env, fetchMap: router(), tables: { track_cache: [{ ...row, fetched_at: daysAgo(age) }] } });
+  const stale = t(2);
+  await handle(post(body), stale.deps);
+  assert.ok(stale.calls.length > 0);
+  const fresh = t(0.5);
+  await handle(post(body), fresh.deps);
+  assert.equal(fresh.calls.length, 0);
+});
+
+test('2回目 ok・1回目 500 でも 2回目の結果を短命で cache する', async () => {
+  const f = (url) => (url.includes('Aizora') ? router({ roman: lastfm('古い曲') })(url) : { status: 500, body: {} }.status && { status: 500, body: {} });
+  const g = (url) => (url.includes('itunes.apple.com') ? { body: ITUNES } : f(url));
+  const { deps, db } = makeDeps({ env, fetchMap: g });
+  const j = await (await handle(post(body), deps)).json();
+  assert.equal(j.popular.length, 1);
+  assert.equal(db.upserts[0].row.payload.partial, true);
+});
+
+test('両方 ok なら partial なし（30日）', async () => {
+  const { deps, db } = makeDeps({ env, fetchMap: router({ jp: lastfm('古い曲'), roman: lastfm('古い曲') }) });
+  await handle(post(body), deps);
+  assert.equal(db.upserts[0].row.payload.partial, undefined);
+  assert.equal(db.upserts[0].row.payload.lastfmFound, true);
+});
+
+test('iTunes の results が配列でない・JSON でないなら 502 UPSTREAM', async () => {
+  for (const itunes of [{ results: 'x' }, { results: null }, 'str']) {
+    const { deps } = makeDeps({ env, fetchMap: () => ({ body: itunes }) });
+    const res = await handle(post(body), deps);
+    assert.equal(res.status, 502);
+  }
+});

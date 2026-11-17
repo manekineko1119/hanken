@@ -5,7 +5,7 @@ import { buildCandidates } from '../_shared/candidates.js';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TIMEOUT_MS = 8000;
 // Last.fm の人気順が取れたものは30日、取れなかった（一致0）ものは1日だけ使い回す。
-const ttlMs = (payload) => (payload?.lastfmFound ? 30 : 1) * DAY_MS;
+const ttlMs = (payload) => (payload?.lastfmFound && !payload?.partial ? 30 : 1) * DAY_MS;
 
 async function fetchItunes(id, deps) {
   const res = await deps.fetch(
@@ -14,7 +14,8 @@ async function fetchItunes(id, deps) {
   );
   if (!res.ok) throw new Error(`itunes ${res.status}`);
   const data = await res.json();
-  const results = data?.results ?? [];
+  const results = data?.results;
+  if (!Array.isArray(results)) throw new Error('itunes bad shape');
   const artist = results.find((r) => r && r.wrapperType === 'artist' && r.artistName);
   const songs = results
     .filter((r) => r && r.wrapperType === 'track' && r.trackName)
@@ -69,19 +70,24 @@ export async function handle(req, deps) {
   }
   const { songs, artistName: itunesName } = itunes;
 
-  const first = await fetchLastfmTitles(artistName, deps);
-  let best = buildCandidates(songs, first.titles);
-  let lastfmOk = first.ok;
+  const lookups = [await fetchLastfmTitles(artistName, deps)];
   if (itunesName && normalizeName(itunesName) !== normalizeName(artistName)) {
-    const second = await fetchLastfmTitles(itunesName, deps);
-    lastfmOk = lastfmOk && second.ok;
-    const alt = buildCandidates(songs, second.titles);
-    if (alt.popular.length > best.popular.length) best = alt;
+    lookups.push(await fetchLastfmTitles(itunesName, deps));
   }
+  // 成功した引き方のうち popular が長い方を使う（同数なら先頭 = artistName）。
+  let best = null;
+  for (const l of lookups.filter((x) => x.ok)) {
+    const c = buildCandidates(songs, l.titles);
+    if (!best || c.popular.length > best.popular.length) best = c;
+  }
+  const anyOk = best !== null;
+  const anyFailed = lookups.some((x) => !x.ok);
+  best ??= buildCandidates(songs, []);
   const payload = { popular: best.popular, recent: best.recent, lastfmFound: best.popular.length > 0 };
+  if (anyOk && anyFailed) payload.partial = true; // 1日で取り直す
 
-  // Last.fm の失敗・キーなしの結果は、みんなが使う cache に入れない。
-  if (lastfmOk) {
+  // Last.fm が全部失敗・キーなしの結果は、みんなが使う cache に入れない。
+  if (anyOk) {
     const { error } = await deps.db.from('track_cache').upsert({
       artist_key: artistKey, payload, fetched_at: deps.now().toISOString(),
     });
