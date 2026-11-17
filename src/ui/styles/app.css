@@ -171,6 +171,7 @@ input[type="text"], input[type="date"], textarea {
 .on-paper > li:last-child { border-bottom: 0; }
 .on-paper button, .on-paper .button { background: transparent; color: var(--ink); border-color: rgba(63, 59, 51, 0.3); }
 .on-paper :focus-visible { outline-color: var(--rain); }
+.on-paper .meta { color: var(--ink); }
 
 .artist-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0; }
 .artist-name { flex: 1; min-width: 0; overflow-wrap: anywhere; font-family: var(--mincho); font-size: 17px; font-weight: 600; }
