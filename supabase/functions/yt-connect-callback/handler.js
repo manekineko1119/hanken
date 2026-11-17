@@ -7,6 +7,17 @@ import { GOOGLE_TOKEN_URL, YT_SCOPE, postForm } from '../_shared/youtube-auth.js
 const CHANNELS_URL = 'https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true';
 
 export async function handle(req, deps) {
+  try {
+    return await run(req, deps);
+  } catch {
+    // ブラウザが開くページなので、想定外の失敗でも JSON ではなく、アプリに戻す。
+    const app = String(deps.env('APP_ORIGIN') ?? '').replace(/\/+$/, '');
+    if (!app) return new Response('error', { status: 500 });
+    return new Response(null, { status: 302, headers: { Location: `${app}/#/settings?yt=error` } });
+  }
+}
+
+async function run(req, deps) {
   if (req.method !== 'GET') return new Response('GET only', { status: 405 });
   const app = String(deps.env('APP_ORIGIN') ?? '').replace(/\/+$/, '');
   if (!app) return new Response('APP_ORIGIN is not set', { status: 500 });

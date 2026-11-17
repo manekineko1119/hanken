@@ -345,3 +345,42 @@ test('disconnect: 行の削除に失敗したら 502（消えたと言わない�
   const res = await disconnect(post({}), mk(db, { [REVOKE]: { body: {} } }).deps);
   assert.equal(res.status, 502);
 });
+
+// ---- fix round 1 ----
+test('getAccessToken: 鍵が未設定でも、読めない暗号文でも、行は消さず UPSTREAM', async () => {
+  const db = makeDb({ youtube_connections: [await connRow()] });
+  const noKey = mk(db);
+  noKey.deps.env = (k) => (k === 'YT_TOKEN_KEY' ? undefined : ENV[k]);
+  await assert.rejects(getAccessToken(db, 'u1', noKey.deps), (e) => e.code === 'UPSTREAM');
+  assert.equal(db.t.youtube_connections.length, 1);
+
+  const db2 = makeDb({ youtube_connections: [await connRow({ refresh_token_enc: 'broken' })] });
+  await assert.rejects(getAccessToken(db2, 'u1', mk(db2).deps), (e) => e.code === 'UPSTREAM');
+  assert.equal(db2.t.youtube_connections.length, 1);
+});
+
+test('getAccessToken: 更新の通信が throw しても UPSTREAM で、行は残す', async () => {
+  const db = makeDb({ youtube_connections: [await connRow()] });
+  const { deps } = mk(db, { [TOKEN_URL]: () => { throw new Error('net'); } });
+  await assert.rejects(getAccessToken(db, 'u1', deps), (e) => e.code === 'UPSTREAM');
+  assert.equal(db.t.youtube_connections.length, 1);
+});
+
+test('callback: db が throw しても 302 で yt=error', async () => {
+  const db = makeDb();
+  db.from = () => { throw new Error('db down'); };
+  const res = await callback(cbReq('code=abc&state=st1'), mk(db, googleOk).deps);
+  assert.equal(res.status, 302);
+  assert.equal(loc(res), ERR);
+});
+
+test('callback: つなぎ直し（既存の行）は上書きされる', async () => {
+  const old = await connRow({ channel_title: 'Old', connected_at: iso(-86400000) });
+  const db = makeDb({ oauth_states: [stateRow()], youtube_connections: [old] });
+  await callback(cbReq('code=abc&state=st1'), mk(db, googleOk).deps);
+  assert.equal(db.t.youtube_connections.length, 1);
+  const row = db.t.youtube_connections[0];
+  assert.equal(row.channel_title, 'My Channel');
+  assert.equal(row.connected_at, NOW.toISOString());
+  assert.equal(await decrypt(row.refresh_token_enc, KEY), 'rt1');
+});
