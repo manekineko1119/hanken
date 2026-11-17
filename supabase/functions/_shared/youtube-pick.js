@@ -6,6 +6,9 @@ const SHORT_SEC = 60;
 const VARIANT_WORDS = [
   'vocal only', 'off vocal', 'on vocal', 'instrumental', 'inst', 'karaoke', 'ニコカラ', 'live', 'ライブ',
   '弾き語り', 'cover', 'カバー', '歌ってみた', 'short', '#shorts', '切り抜き', 'remix',
+  // 楽器の練習・演奏の動画（本人の音源ではない）。2026-11-18 に本番で TAB譜を選んだため足した。
+  'tab譜', '楽譜', '練習曲', 'ピアノ', 'piano', 'オルゴール', '弾いてみた', '叩いてみた',
+  'ギター', 'guitar', 'ベース', 'bass', 'ドラム', 'drum',
 ];
 
 const lower = (s) => String(s ?? '').normalize('NFKC').toLowerCase();
@@ -30,8 +33,9 @@ function topicArtist(channelTitle) {
 // 1. 60秒以下（ショート・切り抜き）を除く（再生時間がわかるときだけ）
 // 2. 曲名が同じ「<同じアーティスト> - Topic」
 // 3. チャンネル名にアーティスト名を含み、曲名を含む、別バージョンでない動画（official を優先）
-// 4. 曲名を含む、別バージョンでない動画
-// 5. 曲名がないときだけ、残りの先頭（曲名があって見つからなければ null）
+// 4. 曲名がまったく同じ「X - Topic」（X がローマ字などで名前が合わなくても）。複数あれば、結果の中によく出る X
+// 5. 曲名を含む、別バージョンでない動画（タイトルにアーティスト名もあるもの、official を優先）
+// 6. 曲名がないときだけ、残りの先頭（曲名があって見つからなければ null）
 export function pickVideo(items, artistName, trackTitle = '') {
   if (!Array.isArray(items)) return null;
   const list = items.filter((it) => !(Number.isFinite(it.durationSec) && it.durationSec <= SHORT_SEC));
@@ -68,8 +72,16 @@ export function pickVideo(items, artistName, trackTitle = '') {
     const c = plain.filter((it) => normalizeName(it.channelTitle).includes(artist) && hasTrack(it)).sort(byOfficial);
     if (c[0]) return c[0];
   }
+  if (wanted) {
+    // 同じアーティストの別の曲も結果に出ている Topic ほど、本人の可能性が高い。
+    const freq = (x) => items.filter((o) => topicArtist(o.channelTitle) === x).length;
+    const exactTopics = list.filter((it) => topicArtist(it.channelTitle) !== null && titleKey(it.title) === wanted);
+    const best = exactTopics.reduce((a, b) => (a && freq(topicArtist(a.channelTitle)) >= freq(topicArtist(b.channelTitle)) ? a : b), null);
+    if (best) return best;
+  }
   if (track) {
-    const c = plain.filter(hasTrack).sort(byOfficial);
+    const named = (it) => Boolean(artist) && normalizeName(it.title).includes(artist);
+    const c = plain.filter(hasTrack).sort((a, b) => Number(named(b)) - Number(named(a)) || byOfficial(a, b));
     if (c[0]) return c[0];
   }
   // 曲名がわかっているのに、曲名を含む動画がなければ「見つからない」（別の曲を選ぶよりよい）。
