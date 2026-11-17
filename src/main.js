@@ -6,7 +6,7 @@ import { renderTabbar } from './views/tabbar.js';
 import { renderLives } from './views/lives.js';
 import { renderLiveDetail } from './views/live-detail.js';
 import { renderLiveEdit } from './views/live-edit.js';
-import { renderSettings } from './views/placeholder.js';
+import { renderSettings } from './views/settings.js';
 import { renderPrep } from './views/prep-list.js';
 import { renderArtistPick } from './views/artist-pick.js';
 import { renderPlaylistEdit } from './views/playlist-edit.js';
