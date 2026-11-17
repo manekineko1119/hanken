@@ -244,3 +244,10 @@ select {
 .artist-row.editing .artist-name { flex: 1 1 auto; min-width: 0; }
 .artist-row.editing button { flex: none; min-width: 40px; padding: 0 6px; }
 .artist-row.editing .handle { min-width: 40px; }
+/* 消す：ゴミ箱のアイコン。枠も地もなく、ふだんは控えめな色 */
+.artist-row.editing button.trash {
+  display: grid; place-items: center;
+  width: 44px; height: 44px; min-width: 44px; padding: 0;
+  border: 0; background: transparent; color: var(--muted);
+}
+.artist-row.editing button.trash:hover, .artist-row.editing button.trash:focus-visible { color: var(--danger); }

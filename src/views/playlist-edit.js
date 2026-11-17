@@ -1,4 +1,4 @@
-import { el, setChildren, backLink, loadView } from '../ui/dom.js';
+import { el, setChildren, backLink, loadView, trashIcon } from '../ui/dom.js';
 import { getPlaylist, saveTracks } from '../data/playlists.js';
 import { renderPlaylistConfirm } from './playlist-confirm.js';
 import { getStatus, connect } from '../data/youtube.js';
@@ -16,11 +16,8 @@ function trackRow(t, i, tracks, on, editing, busy) {
   if (!editing) {
     return el('li', { class: 'artist-row' }, el('span', { class: 'artist-name', text: `${i + 1}. ${t.title}` }));
   }
-  const btn = (label, aria, fn, disabled, cls) => {
-    const b = el('button', { type: 'button', class: cls, text: label, 'aria-label': aria, disabled });
-    b.addEventListener('click', fn);
-    return b;
-  };
+  const trash = el('button', { type: 'button', class: 'trash', 'aria-label': `${t.title} を消す`, title: '消す', disabled: busy }, trashIcon());
+  trash.addEventListener('click', () => on.remove(i));
   const handle = el('button', {
     type: 'button', class: 'handle', text: '≡', disabled: busy || t.isLatest, 'data-index': String(i),
     'aria-label': `${t.title} を並べ替える（引きずる。矢印キーの上下でも動かせます）`,
@@ -32,7 +29,7 @@ function trackRow(t, i, tracks, on, editing, busy) {
   const li = el('li', { class: 'artist-row editing' },
     handle,
     el('span', { class: 'artist-name', text: `${i + 1}. ${t.title}` }),
-    btn('消す', `${t.title} を消す`, () => on.remove(i), busy, 'danger'));
+    trash);
   return { li, handle };
 }
 
@@ -141,7 +138,7 @@ export function renderPlaylistEdit(container, ctx) {
           list.append(r.li);
           attachDrag(r.handle, r.li, list, { from: i, maxIndex, onDrop: on.drop });
           if (focusTo && focusTo.i === i) {
-            const target = focusTo.role === 'del' ? r.li.querySelector('.danger') : r.handle;
+            const target = focusTo.role === 'del' ? r.li.querySelector('.trash') : r.handle;
             queueMicrotask(() => target.focus());
           }
         } else {
