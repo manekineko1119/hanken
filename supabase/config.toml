@@ -453,3 +453,7 @@ verify_jwt = false
 [functions.yt-disconnect]
 entrypoint = "./functions/yt-disconnect/index.js"
 verify_jwt = true
+
+[functions.yt-resolve-videos]
+entrypoint = "./functions/yt-resolve-videos/index.js"
+verify_jwt = true
