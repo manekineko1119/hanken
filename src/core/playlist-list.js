@@ -20,10 +20,10 @@ export function sortPlaylists(items, sort) {
   return list.sort(byText((p) => p.createdAt, -1));
 }
 
-// status：'all'・'saved'・'draft'。text：アーティスト名かタイトルに含まれる文字（大文字小文字は区別しない）。
-export function filterPlaylists(items, { status = 'all', text = '' } = {}) {
+// kind：'all'・'prep'（予習）・'setlist'（セトリ）。text：アーティスト名かタイトルに含まれる文字（大文字小文字は区別しない）。
+export function filterPlaylists(items, { kind = 'all', text = '' } = {}) {
   const q = String(text).trim().toLowerCase();
-  return items.filter((p) => (status === 'all' || p.status === status)
+  return items.filter((p) => (kind === 'all' || p.kind === kind)
     && (!q || `${p.title}\n${p.artistName}`.toLowerCase().includes(q)));
 }
 
@@ -38,4 +38,17 @@ export function needsReflect({ status, savedAt, editedAt }) {
 
 export function youtubeMusicUrl(youtubePlaylistId) {
   return youtubePlaylistId ? `https://music.youtube.com/playlist?list=${encodeURIComponent(youtubePlaylistId)}` : null;
+}
+
+const SORT_KEYS = ['newest', 'oldest', 'live-date'];
+const KIND_KEYS = ['all', 'prep', 'setlist'];
+
+// 覚えていた並び方・絞り込みを直す。古い形（status など）や壊れた値は、既定に戻す。
+export function normalizePref(v) {
+  const o = v && typeof v === 'object' ? v : {};
+  return {
+    sort: SORT_KEYS.includes(o.sort) ? o.sort : 'newest',
+    kind: KIND_KEYS.includes(o.kind) ? o.kind : 'all',
+    text: typeof o.text === 'string' ? o.text.slice(0, 100) : '',
+  };
 }

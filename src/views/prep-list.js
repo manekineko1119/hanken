@@ -1,23 +1,16 @@
 import { el, setChildren, loadView } from '../ui/dom.js';
 import { listPlaylists } from '../data/playlists.js';
 import { runStart } from './prep-flow.js';
-import { sortPlaylists, filterPlaylists, youtubeMusicUrl } from '../core/playlist-list.js';
+import { sortPlaylists, filterPlaylists, youtubeMusicUrl, normalizePref } from '../core/playlist-list.js';
 import { formatDateJa } from '../core/lives.js';
 
-const SORTS = [['newest', '作った順（新しい順）'], ['oldest', '古い順'], ['live-date', 'ライブの日付順']];
-const STATUSES = [['all', 'すべて'], ['saved', '保存済み'], ['draft', 'まだ保存していない']];
+const SORTS = [['newest', '新しい順'], ['oldest', '古い順'], ['live-date', 'ライブ順']];
+const KINDS = [['all', 'すべて'], ['prep', '予習'], ['setlist', 'セトリ']];
 const KEY = 'hanken.playlistView';
 
 // 選んだ並び方・絞り込みを覚える（なくても動く）。
 function loadPref() {
-  const pref = { sort: 'newest', status: 'all', text: '' };
-  try {
-    const v = JSON.parse(localStorage.getItem(KEY) ?? 'null');
-    if (v && SORTS.some(([k]) => k === v.sort)) pref.sort = v.sort;
-    if (v && STATUSES.some(([k]) => k === v.status)) pref.status = v.status;
-    if (v && typeof v.text === 'string') pref.text = v.text.slice(0, 100);
-  } catch { /* 読めなければ既定のまま */ }
-  return pref;
+  try { return normalizePref(JSON.parse(localStorage.getItem(KEY) ?? 'null')); } catch { return normalizePref(null); }
 }
 function savePref(pref) {
   try { localStorage.setItem(KEY, JSON.stringify(pref)); } catch { /* 保存できなくてもよい */ }
@@ -43,10 +36,10 @@ function row(p) {
 }
 
 function select(label, options, value, onChange) {
-  const s = el('select', { 'aria-label': label }, ...options.map(([k, t]) => el('option', { value: k, text: t })));
+  const s = el('select', { 'aria-label': label, class: 'filter-select' }, ...options.map(([k, t]) => el('option', { value: k, text: t })));
   s.value = value;
   s.addEventListener('change', () => onChange(s.value));
-  return el('label', { class: 'control' }, el('span', { class: 'label', text: label }), s);
+  return s;
 }
 
 export function renderPrep(container, ctx) {
@@ -58,11 +51,11 @@ export function renderPrep(container, ctx) {
       setChildren(listBox,
         shown.length
           ? el('ul', { class: 'list' }, ...shown.map(row))
-          : el('p', { class: 'note', text: items.length ? '条件に合うプレイリストがありません' : 'まだありません' }));
+          : el('p', { class: 'note', text: pref.kind === 'setlist' ? 'セトリはまだありません' : items.length ? '条件に合うプレイリストがありません' : 'まだありません' }));
     };
     const change = (patch) => { Object.assign(pref, patch); savePref(pref); drawList(); };
 
-    const search = el('input', { type: 'text', maxlength: '100', placeholder: 'アーティスト名・タイトルで絞る', 'aria-label': 'アーティスト名・タイトルで絞る', value: pref.text });
+    const search = el('input', { type: 'text', maxlength: '100', class: 'filter-search', placeholder: '探す（アーティスト・題名）', 'aria-label': 'アーティスト名・タイトルで絞る', value: pref.text });
     search.addEventListener('input', () => change({ text: search.value }));
 
     const input = el('input', { type: 'text', maxlength: '100', placeholder: 'アーティスト名', 'aria-label': 'アーティスト名' });
@@ -82,9 +75,9 @@ export function renderPrep(container, ctx) {
       el('h1', { text: 'プレイリスト' }),
       items.length
         ? el('div', { class: 'filters' },
+          search,
           select('並び順', SORTS, pref.sort, (v) => change({ sort: v })),
-          select('状態', STATUSES, pref.status, (v) => change({ status: v })),
-          el('label', { class: 'control' }, el('span', { class: 'label', text: '探す' }), search))
+          select('種類', KINDS, pref.kind, (v) => change({ kind: v })))
         : null,
       listBox,
       el('h2', { text: 'アーティスト名から新しく作る' }),
