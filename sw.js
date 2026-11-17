@@ -6,7 +6,7 @@
    - 入れるのは、同じオリジンの静的ファイルだけ。
    - パスはすべて相対（./）。GitHub Pages のサブパスでも動くようにする。
    アプリのファイルを足す・消したときは、PRECACHE_URLS を直し、VERSION を上げる（tests/sw.test.js が漏れを見つける）。 */
-var VERSION = 'v1';
+var VERSION = 'v2';
 var CACHE_PREFIX = 'hanken-';
 var CACHE_NAME = CACHE_PREFIX + VERSION;
 
@@ -21,6 +21,7 @@ var PRECACHE_URLS = [
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
   './vendor/supabase-js.mjs',
+  './supabase/functions/_shared/normalize.js',
   './src/main.js',
   './src/router.js',
   './src/config.js',
