@@ -1,9 +1,9 @@
 import { el, setChildren, backLink, loadView, trashIcon } from '../ui/dom.js';
-import { getPlaylist, saveTracks } from '../data/playlists.js';
+import { getPlaylist, saveTracks, deletePlaylist } from '../data/playlists.js';
 import { renderPlaylistConfirm } from './playlist-confirm.js';
 import { getStatus, connect } from '../data/youtube.js';
 import { playlistHref } from '../router.js';
-import { needsReflect } from '../core/playlist-list.js';
+import { needsReflect, deleteConfirmText } from '../core/playlist-list.js';
 import { moveTrackTo, maxDropIndex } from '../core/reorder.js';
 import { attachDrag, cancelActiveDrag } from '../ui/drag-reorder.js';
 import { replaceTrack, moveTrack, addManualTrack, hasPopularity } from '../core/prep.js';
@@ -129,6 +129,26 @@ export function renderPlaylistEdit(container, ctx) {
       }
     }
 
+    // 消したら来た画面（予習の一覧かライブの詳細）へ戻り、PC の左の一覧も読み直す。
+    async function onDelete() {
+      if (busy) return;
+      if (!confirm(deleteConfirmText({ title: pl.title, youtubePlaylistId: pl.youtube_playlist_id }))) return;
+      busy = true;
+      message = '';
+      draw();
+      try {
+        await deletePlaylist(id);
+        if (!ctx.alive()) return;
+        ctx.onPlaylistSaved?.();
+        location.hash = back;
+      } catch {
+        if (!ctx.alive()) return;
+        busy = false;
+        message = '消せませんでした。通信を確かめて、もう一度押してください';
+        draw();
+      }
+    }
+
     function draw() {
       const typed = input.value;
       const list = el('ul', { class: 'list' });
@@ -151,6 +171,8 @@ export function renderPlaylistEdit(container, ctx) {
       toggle.addEventListener('click', () => { editing = !editing; focusTo = 'toggle'; draw(); focusTo = null; });
       const save = el('button', { type: 'button', class: 'primary', disabled: busy || tracks.length === 0, text: pl.status === 'saved' ? 'YouTube Music に反映' : 'YouTube Music に保存' });
       save.addEventListener('click', goSave);
+      const del = el('button', { type: 'button', class: 'danger delete-playlist', disabled: busy, text: 'このプレイリストを消す' });
+      del.addEventListener('click', onDelete);
       setChildren(container,
         backLink(back, '戻る'),
         el('h1', { text: pl.title }),
@@ -160,7 +182,9 @@ export function renderPlaylistEdit(container, ctx) {
         tracks.length < 10 ? el('p', { class: 'note', text: '候補がもうありません。曲名で探して足せます' }) : null,
         message ? el('p', { class: 'note error', role: 'alert', text: message }) : null,
         el('div', { class: 'artist-edit' }, input, addBtn),
-        el('div', { class: 'actions' }, save, toggle));
+        el('div', { class: 'actions' }, save, toggle),
+        // 保存・編集と離して置く（押し間違えないように）。
+        el('div', { class: 'actions' }, del));
       input.value = typed;
       if (focusTo === 'toggle') toggle.focus();
     }

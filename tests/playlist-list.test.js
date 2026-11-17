@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sortPlaylists, filterPlaylists, needsReflect, youtubeMusicUrl, normalizePref } from '../src/core/playlist-list.js';
+import { sortPlaylists, filterPlaylists, needsReflect, youtubeMusicUrl, normalizePref, deleteConfirmText } from '../src/core/playlist-list.js';
 
 const mk = (id, o = {}) => ({ id, title: `T${id}`, artistName: 'A', status: 'draft', createdAt: '2026-11-01T00:00:00Z', live: null, ...o });
 const a = mk('a', { createdAt: '2026-11-01T00:00:00Z', live: { date: '2026-12-10', venue: 'X' } });
@@ -66,4 +66,17 @@ test('needsReflect: 時刻の書き方（Z と +00:00）が混ざっても、時
 test('needsReflect: 読めない時刻は「反映済み」にしない／editedAt がなければ false', () => {
   assert.equal(needsReflect({ status: 'saved', savedAt: 'broken', editedAt: '2026-11-01T10:00:05Z' }), true);
   assert.equal(needsReflect({ status: 'saved', savedAt: '2026-11-01T10:00:05Z', editedAt: 'broken' }), false);
+});
+
+test('deleteConfirmText：YouTube に保存したものは残ると伝える', () => {
+  const saved = deleteConfirmText({ title: '【予習】泡く、脆く。', youtubePlaylistId: 'PLx' });
+  assert.match(saved, /【予習】泡く、脆く。/);
+  assert.match(saved, /元に戻せません/);
+  assert.match(saved, /YouTube.*残ります/);
+});
+
+test('deleteConfirmText：保存していない下書きには YouTube の話を出さない', () => {
+  const draft = deleteConfirmText({ title: '【予習】あわくもろく', youtubePlaylistId: null });
+  assert.match(draft, /元に戻せません/);
+  assert.doesNotMatch(draft, /YouTube/);
 });

@@ -28,6 +28,11 @@ export async function createPrepDraft({ liveId, liveArtistId, artistName, itunes
   return data.id;
 }
 
+// アプリの記録だけを消す（曲の行は FK の cascade で消える）。YouTube 上のプレイリストは消さない。
+export async function deletePlaylist(id) {
+  check(await getClient().from('playlists').delete().eq('id', id));
+}
+
 export async function getPlaylist(id) {
   const db = getClient();
   const { data, error } = await db.from('playlists')
