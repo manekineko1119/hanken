@@ -1,4 +1,5 @@
 import { prelude, readJson, json, errorJson } from '../_shared/http.js';
+import { decodeEntities } from '../_shared/html-entities.js';
 import { normalizeName, titleKey } from '../_shared/normalize.js';
 import { LIMITS } from '../_shared/quota.js';
 import { getSearchUsage, incrementUsage } from '../_shared/usage.js';
@@ -26,7 +27,7 @@ async function searchVideos(deps, key, artist, title) {
   const data = await res.json();
   return (data?.items ?? [])
     .filter((it) => it?.id?.videoId)
-    .map((it) => ({ videoId: it.id.videoId, title: it.snippet?.title ?? '', channelTitle: it.snippet?.channelTitle ?? '' }));
+    .map((it) => ({ videoId: it.id.videoId, title: decodeEntities(it.snippet?.title), channelTitle: decodeEntities(it.snippet?.channelTitle) }));
 }
 
 // ISO 8601 の長さ（PT4M33S など）を秒にする。読めなければ null。
@@ -84,7 +85,7 @@ export async function handle(req, deps) {
     const state = new Map(tracks.map((t) => [t.id, { videoId: t.video_id ?? null, videoTitle: t.video_title ?? null }]));
     const setVideo = async (t, v) => {
       const patch = v
-        ? { video_id: v.videoId, video_title: v.title, video_checked_at: nowIso }
+        ? { video_id: v.videoId, video_title: v.title, video_checked_at: v.checkedAt ?? nowIso }
         : { video_id: null, video_title: null, video_checked_at: null };
       const r = await deps.db.from('playlist_tracks').update(patch).eq('id', t.id);
       if (r.error) throw upstream('動画を保存できませんでした');
@@ -127,7 +128,8 @@ export async function handle(req, deps) {
         if (c.error) throw upstream('動画の記録を読めませんでした');
         const isDead = c.data?.video_id && c.data.video_id === dead.get(t.id);
         if (c.data && Date.parse(c.data.fetched_at) > nowMs - FRESH_MS && !isDead) {
-          hit = c.data.video_id ? { videoId: c.data.video_id, title: c.data.video_title ?? '' } : null;
+          // 元の確認時刻を引き継ぐ（コピーしただけで新しくしない）
+          hit = c.data.video_id ? { videoId: c.data.video_id, title: c.data.video_title ?? '', checkedAt: c.data.fetched_at } : null;
         }
       }
       if (hit === undefined) {
