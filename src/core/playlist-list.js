@@ -58,3 +58,9 @@ export function deleteConfirmText({ title, youtubePlaylistId }) {
   const head = `「${title}」を消しますか？消すと元に戻せません。`;
   return youtubePlaylistId ? `${head}YouTube に保存したプレイリストは残ります（消したいときは YouTube で消してください）。` : head;
 }
+
+// プレイリストの名前をどこで変えるか。YouTube に保存済みなら、保存の確認の画面で変える
+// （保存の処理が、DB の名前と違うときに YouTube 側の名前も変えるため。編集の画面で DB だけ変えるとずれる）。
+export function renameWhere({ youtubePlaylistId } = {}) {
+  return youtubePlaylistId ? "confirm" : "here";
+}

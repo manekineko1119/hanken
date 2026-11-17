@@ -1,9 +1,10 @@
 import { el, setChildren, backLink, loadView, trashIcon } from '../ui/dom.js';
-import { getPlaylist, saveTracks, deletePlaylist } from '../data/playlists.js';
+import { getPlaylist, saveTracks, deletePlaylist, renamePlaylist } from '../data/playlists.js';
 import { renderPlaylistConfirm } from './playlist-confirm.js';
 import { getStatus, connect } from '../data/youtube.js';
 import { playlistHref } from '../router.js';
-import { needsReflect, deleteConfirmText } from '../core/playlist-list.js';
+import { needsReflect, deleteConfirmText, renameWhere } from '../core/playlist-list.js';
+import { cleanName } from '../core/save-confirm.js';
 import { moveTrackTo, maxDropIndex } from '../core/reorder.js';
 import { attachDrag, cancelActiveDrag } from '../ui/drag-reorder.js';
 import { replaceTrack, moveTrack, addManualTrack, hasPopularity } from '../core/prep.js';
@@ -129,6 +130,43 @@ export function renderPlaylistEdit(container, ctx) {
       }
     }
 
+    // 名前を変える。保存済みなら保存の確認の画面へ（YouTube 側の名前もそろえる）。まだなら、ここで変える。
+    let renaming = false;
+    const nameInput = el('input', { type: 'text', maxlength: '150', 'aria-label': 'プレイリストの名前' });
+    function startRename() {
+      if (busy) return;
+      if (renameWhere({ youtubePlaylistId: pl.youtube_playlist_id }) === 'confirm') { goSave(); return; }
+      renaming = true;
+      nameInput.value = pl.title;
+      message = '';
+      draw();
+      queueMicrotask(() => { nameInput.focus(); nameInput.select(); });
+    }
+    async function finishRename() {
+      const title = cleanName(nameInput.value);
+      if (!title) { message = '名前を入れてください（150文字まで）'; draw(); return; }
+      if (title === pl.title) { renaming = false; draw(); return; }
+      busy = true;
+      draw();
+      try {
+        await renamePlaylist(id, title);
+        if (!ctx.alive()) return;
+        pl.title = title;
+        renaming = false;
+        message = '';
+        ctx.onPlaylistSaved?.();
+      } catch {
+        if (!ctx.alive()) return;
+        message = '名前を変えられませんでした。通信を確かめてください';
+      }
+      busy = false;
+      draw();
+    }
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); finishRename(); }
+      if (e.key === 'Escape') { renaming = false; message = ''; draw(); }
+    });
+
     // 消したら来た画面（予習の一覧かライブの詳細）へ戻り、PC の左の一覧も読み直す。
     async function onDelete() {
       if (busy) return;
@@ -147,6 +185,20 @@ export function renderPlaylistEdit(container, ctx) {
         message = '消せませんでした。通信を確かめて、もう一度押してください';
         draw();
       }
+    }
+
+    function titleBlock() {
+      if (renaming) {
+        const okBtn = el('button', { type: 'button', class: 'primary', disabled: busy, text: '決める' });
+        okBtn.addEventListener('click', finishRename);
+        const cancel = el('button', { type: 'button', disabled: busy, text: 'やめる' });
+        cancel.addEventListener('click', () => { renaming = false; message = ''; draw(); });
+        nameInput.disabled = busy;
+        return [el('h1', { text: pl.title, class: 'visually-hidden' }), el('div', { class: 'artist-edit rename' }, nameInput, okBtn, cancel)];
+      }
+      const rename = el('button', { type: 'button', class: 'link', disabled: busy, text: '名前を変える' });
+      rename.addEventListener('click', startRename);
+      return [el('h1', { text: pl.title }), rename];
     }
 
     function draw() {
@@ -175,7 +227,7 @@ export function renderPlaylistEdit(container, ctx) {
       del.addEventListener('click', onDelete);
       setChildren(container,
         backLink(back, '戻る'),
-        el('h1', { text: pl.title }),
+        ...titleBlock(),
         unreflected ? el('p', { class: 'note', role: 'status', text: 'YouTube Music にまだ反映していません' }) : null,
         !hasPopularity(tracks, rest) ? el('p', { class: 'note', text: '人気の順のデータがないため、新しい順です' }) : null,
         list,

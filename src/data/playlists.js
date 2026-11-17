@@ -33,6 +33,11 @@ export async function deletePlaylist(id) {
   check(await getClient().from('playlists').delete().eq('id', id));
 }
 
+// 名前だけを変える（YouTube にまだ保存していないプレイリスト用）。
+export async function renamePlaylist(id, title) {
+  check(await getClient().from("playlists").update({ title }).eq("id", id));
+}
+
 export async function getPlaylist(id) {
   const db = getClient();
   const { data, error } = await db.from('playlists')
