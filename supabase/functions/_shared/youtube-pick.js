@@ -31,7 +31,7 @@ function topicArtist(channelTitle) {
 // 2. 曲名が同じ「<同じアーティスト> - Topic」
 // 3. チャンネル名にアーティスト名を含み、曲名を含む、別バージョンでない動画（official を優先）
 // 4. 曲名を含む、別バージョンでない動画
-// 5. 残りの先頭
+// 5. 曲名がないときだけ、残りの先頭（曲名があって見つからなければ null）
 export function pickVideo(items, artistName, trackTitle = '') {
   if (!Array.isArray(items)) return null;
   const list = items.filter((it) => !(Number.isFinite(it.durationSec) && it.durationSec <= SHORT_SEC));
@@ -46,10 +46,13 @@ export function pickVideo(items, artistName, trackTitle = '') {
       const n = normalizeName(x);
       if (!n) return false;
       if (n === artist) return true;
-      // 日本語名のアーティストのローマ字の Topic：同じ結果の中に、アーティスト名とそのローマ字を両方含むチャンネルがあるか。
-      return list.some((o) => {
-        const c = normalizeName(o.channelTitle);
-        return c.includes(artist) && c.includes(n);
+      // 日本語名のアーティストのローマ字の Topic：同じ結果の中（ショートも含む）に、アーティスト名とそのローマ字を両方含むチャンネルがあるか。
+      // 短い名前（Kai など）が、別のアーティスト名の一部に当たらないよう、3文字以上で、チャンネル名の語と丸ごと一致するものだけ。
+      if (n.length < 3) return false;
+      return items.some((o) => {
+        if (!normalizeName(o.channelTitle).includes(artist)) return false;
+        const tokens = lower(o.channelTitle).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+        return tokens.includes(n);
       });
     };
     const ok = topics.filter((it) => sameArtist(topicArtist(it.channelTitle)));
@@ -69,5 +72,6 @@ export function pickVideo(items, artistName, trackTitle = '') {
     const c = plain.filter(hasTrack).sort(byOfficial);
     if (c[0]) return c[0];
   }
-  return list[0];
+  // 曲名がわかっているのに、曲名を含む動画がなければ「見つからない」（別の曲を選ぶよりよい）。
+  return track ? null : list[0];
 }
