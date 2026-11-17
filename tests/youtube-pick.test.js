@@ -80,3 +80,42 @@ test('再生時間がわからない動画は、ショート扱いしない', ()
   const items = [{ videoId: '1', title: '曲1', channelTitle: 'バンドA - Topic' }];
   assert.equal(pickVideo(items, 'バンドA', '曲1').videoId, '1');
 });
+
+// 本番で取り違えた例（2026-11-18、「泡く、脆く。」の Topic はローマ字の「awaku moroku - Topic」）。
+const yv = (videoId, channelTitle, title) => ({ videoId, channelTitle, title });
+const AOI = [
+  yv('piano', 'ゆったりピアノレッスン', '青い糸 - 泡く、脆く。【ピアノ練習曲】簡単・楽譜・ドレミ付き'),
+  yv('own', 'awaku moroku - Topic', '青い糸'),
+  yv('orgel', 'ゆったりオルゴール', '青い糸 - 泡く、脆く。【オルゴールver.】'),
+  yv('micro', 'MicroVEVO', 'Micro - 青い糸'),
+  yv('sneaker', 'スニーカーエイジ Youtubeチャンネル', '青い糸'),
+  yv('x1', 'awaku moroku - Topic', '結う。'),
+  yv('other-topic', '心と体 - Topic', '青い糸'),
+  yv('x2', 'awaku moroku - Topic', '昨日の僕より君を唄う'),
+];
+
+test('pickVideo：ローマ字の Topic でも、曲名が同じ Topic を、曲名を含むだけの動画より先に選ぶ', () => {
+  assert.equal(pickVideo(AOI, '泡く、脆く。', '青い糸')?.videoId, 'own');
+});
+
+test('pickVideo：曲名が同じ Topic が複数あれば、結果の中によく出る Topic（同じアーティストの別の曲もある）を選ぶ', () => {
+  const reordered = [AOI[6], ...AOI.filter((x) => x !== AOI[6])];
+  assert.equal(pickVideo(reordered, '泡く、脆く。', '青い糸')?.videoId, 'own');
+});
+
+test('pickVideo：TAB譜・ピアノ・オルゴール・楽器の弾いてみたは別バージョンとして選ばない', () => {
+  const items = [
+    yv('tab', 'やまさんルーム 【TAB譜動画】', '【TAB譜】『綴り字 - 泡く、脆く。』【Bass】【ダウンロード可】'),
+    yv('piano', 'ゆったりピアノレッスン', '綴り字 - 泡く、脆く。【ピアノ練習曲】簡単・楽譜・ドレミ付き'),
+    yv('orgel', 'ゆったりオルゴール', '綴り字 - 泡く、脆く。【オルゴールver.】'),
+    yv('play', 'だれか', '綴り字 / 泡く、脆く。 ギター 弾いてみた'),
+    yv('mv', '泡く、脆く。', '綴り字 - 泡く、脆く。 Music Video'),
+  ];
+  assert.equal(pickVideo(items, '泡く、脆く。', '綴り字')?.videoId, 'mv');
+  assert.equal(pickVideo(items.slice(0, 4), '泡く、脆く。', '綴り字'), null);
+});
+
+test('pickVideo：曲名を含む動画のうち、タイトルにアーティスト名もあるものを先に選ぶ', () => {
+  const items = [yv('micro', 'MicroVEVO', 'Micro - 青い糸'), yv('ok', 'だれか', '青い糸 / 泡く、脆く。')];
+  assert.equal(pickVideo(items, '泡く、脆く。', '青い糸')?.videoId, 'ok');
+});
