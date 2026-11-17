@@ -55,11 +55,11 @@ export async function saveTracks(id, tracks, rest) {
 // 自分のプレイリストを全部（ライブの予習も、予習だけも。下書きも保存済みも）。並び替え・絞り込みは src/core/playlist-list.js。
 export async function listPlaylists() {
   const { data, error } = await getClient().from('playlists')
-    .select('id, title, artist_name, status, youtube_playlist_id, created_at, live:lives(date, venue)')
-    .eq('kind', 'prep').order('created_at', { ascending: false });
+    .select('id, kind, title, artist_name, status, youtube_playlist_id, created_at, live:lives(date, venue)')
+    .order('created_at', { ascending: false });
   if (error) throw error;
   return data.map((p) => ({
-    id: p.id, title: p.title, artistName: p.artist_name, status: p.status,
+    id: p.id, kind: p.kind, title: p.title, artistName: p.artist_name, status: p.status,
     youtubePlaylistId: p.youtube_playlist_id, createdAt: p.created_at,
     live: p.live ? { date: p.live.date, venue: p.live.venue } : null,
   }));

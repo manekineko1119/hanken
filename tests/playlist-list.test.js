@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sortPlaylists, filterPlaylists, needsReflect, youtubeMusicUrl } from '../src/core/playlist-list.js';
+import { sortPlaylists, filterPlaylists, needsReflect, youtubeMusicUrl, normalizePref } from '../src/core/playlist-list.js';
 
 const mk = (id, o = {}) => ({ id, title: `T${id}`, artistName: 'A', status: 'draft', createdAt: '2026-11-01T00:00:00Z', live: null, ...o });
 const a = mk('a', { createdAt: '2026-11-01T00:00:00Z', live: { date: '2026-12-10', venue: 'X' } });
@@ -19,19 +19,29 @@ test('sortPlaylists: ライブの日付順（早い順。ライブなしは最�
   assert.deepEqual(input.map((p) => p.id), ['a', 'b', 'c']);
 });
 
-test('filterPlaylists: 状態で絞る', () => {
-  assert.equal(filterPlaylists([a, b, c], { status: 'all', text: '' }).length, 3);
-  assert.deepEqual(filterPlaylists([a, b, c], { status: 'saved', text: '' }).map((p) => p.id), ['b']);
-  assert.deepEqual(filterPlaylists([a, b, c], { status: 'draft', text: '' }).map((p) => p.id), ['a', 'c']);
+test('filterPlaylists: 種類（予習・セトリ）で絞る', () => {
+  const s1 = mk('s1', { kind: 'setlist' });
+  const p1 = mk('p1', { kind: 'prep' });
+  assert.equal(filterPlaylists([s1, p1], { kind: 'all', text: '' }).length, 2);
+  assert.deepEqual(filterPlaylists([s1, p1], { kind: 'prep', text: '' }).map((p) => p.id), ['p1']);
+  assert.deepEqual(filterPlaylists([s1, p1], { kind: 'setlist', text: '' }).map((p) => p.id), ['s1']);
+  assert.deepEqual(filterPlaylists([p1], { kind: 'setlist', text: '' }), []);
+});
+
+test('normalizePref: 古い保存値・壊れた値は既定に直す', () => {
+  assert.deepEqual(normalizePref(null), { sort: 'newest', kind: 'all', text: '' });
+  assert.deepEqual(normalizePref({ sort: 'oldest', status: 'saved', text: 'x' }), { sort: 'oldest', kind: 'all', text: 'x' });
+  assert.deepEqual(normalizePref({ sort: 'bogus', kind: 'setlist', text: 5 }), { sort: 'newest', kind: 'setlist', text: '' });
+  assert.equal(normalizePref({ text: 'a'.repeat(300) }).text.length, 100);
 });
 
 test('filterPlaylists: アーティスト名かタイトルで絞る（大文字小文字・前後の空白を無視）', () => {
   const x = mk('x', { title: 'Summer Songs', artistName: 'Kaze' });
   const y = mk('y', { title: '予習', artistName: 'Umi' });
-  assert.deepEqual(filterPlaylists([x, y], { status: 'all', text: '  kaze ' }).map((p) => p.id), ['x']);
-  assert.deepEqual(filterPlaylists([x, y], { status: 'all', text: 'summer' }).map((p) => p.id), ['x']);
-  assert.deepEqual(filterPlaylists([x, y], { status: 'all', text: '予' }).map((p) => p.id), ['y']);
-  assert.deepEqual(filterPlaylists([x, y], { status: 'saved', text: 'kaze' }), []);
+  assert.deepEqual(filterPlaylists([x, y], { kind: 'all', text: '  kaze ' }).map((p) => p.id), ['x']);
+  assert.deepEqual(filterPlaylists([x, y], { kind: 'all', text: 'summer' }).map((p) => p.id), ['x']);
+  assert.deepEqual(filterPlaylists([x, y], { kind: 'all', text: '予' }).map((p) => p.id), ['y']);
+  assert.deepEqual(filterPlaylists([x, y], { kind: 'setlist', text: 'kaze' }), []);
 });
 
 test('needsReflect: 保存済みで、保存のあとに曲を変えたときだけ true', () => {

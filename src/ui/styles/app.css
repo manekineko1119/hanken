@@ -52,7 +52,17 @@ main { padding-top: 16px; padding-bottom: 96px; }
 
 h1 { font-family: var(--mincho); font-size: 23px; font-weight: 600; line-height: 1.45; margin: 8px 0 12px; }
 h2 { font-size: 14px; font-weight: 400; margin: 28px 0 10px; color: var(--muted); }
+/* 本文のリンク：ふだんは薄い下線、さわると濃く。ボタン・戻る・行のリンクは、それぞれの規則に任せる */
 a { color: var(--accent); }
+a:not(.button):not(.back):not(.row) {
+  font-family: var(--font);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  text-underline-offset: 3px;
+}
+a:not(.button):not(.back):not(.row):hover { color: var(--text); text-decoration-color: var(--text); }
+a:focus-visible { border-radius: 2px; }
+a[target="_blank"]:not(.button)::after { content: '↗'; margin-left: 2px; font-size: 0.85em; }
 
 button, .button {
   display: inline-flex;
@@ -194,8 +204,9 @@ input[type="text"], input[type="date"], textarea {
 .on-paper .status { color: var(--ink-soft); }
 .on-paper .status-saved { color: var(--rain); }
 
-.filters { display: grid; gap: 8px; margin: 8px 0 12px; }
-.control { display: block; }
+.filters { display: flex; gap: 6px; margin: 8px 0 12px; }
+.filters .filter-search { flex: 1 1 0; min-width: 0; width: auto; }
+.filters .filter-select { flex: none; width: auto; max-width: 112px; padding: 8px 6px; }
 select {
   width: 100%; min-height: 44px; padding: 8px 12px;
   border: 1px solid var(--line); border-radius: 8px;
