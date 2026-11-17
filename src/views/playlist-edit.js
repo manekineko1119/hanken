@@ -196,7 +196,7 @@ export function renderPlaylistEdit(container, ctx) {
         nameInput.disabled = busy;
         return [el('h1', { text: pl.title, class: 'visually-hidden' }), el('div', { class: 'artist-edit rename' }, nameInput, okBtn, cancel)];
       }
-      const rename = el('button', { type: 'button', class: 'link', disabled: busy, text: '名前を変える' });
+      const rename = el('button', { type: 'button', class: 'link', disabled: busy, text: '名前を変更' });
       rename.addEventListener('click', startRename);
       return [el('h1', { text: pl.title }), rename];
     }
