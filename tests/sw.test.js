@@ -128,3 +128,14 @@ test('privacy.html：アプリ名・取るデータ・30日・取り消し方が
   assert.match(h, /href="\.\/"/);
   assert.doesNotMatch(h, /[\w.+-]+@[\w-]+\.[\w.]+/);
 });
+
+test('sw.js：precache は cache: reload、fetch は cache: no-cache で、HTTP キャッシュの古いファイルを入れない', () => {
+  assert.match(swSource, /new Request\(u, \{ cache: 'reload' \}\)/);
+  assert.match(swSource, /fetch\(req, \{ cache: 'no-cache' \}\)/);
+});
+
+test('privacy.html：動画の情報の保存期間（30日・60日）を設計書どおりに書く', () => {
+  const h = readFileSync(new URL('privacy.html', root), 'utf8');
+  assert.match(h, /60日/);
+  assert.doesNotMatch(h, /最長30日までしか/);
+});
