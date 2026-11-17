@@ -120,3 +120,10 @@ async function start() {
 
 window.addEventListener('hashchange', render);
 start();
+
+// オフラインでも開けるように Service Worker を登録する（登録できなくてもアプリは動く）。
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}

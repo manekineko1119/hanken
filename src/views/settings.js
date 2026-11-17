@@ -76,7 +76,7 @@ export function renderSettings(container, ctx) {
       msg,
       el('h2', { text: 'アカウント' }),
       out,
-      el('p', {}, el('a', { href: '#/privacy', text: 'プライバシーポリシー' })),
+      el('p', {}, el('a', { href: './privacy.html', text: 'プライバシーポリシー' })),
     );
   });
 }
