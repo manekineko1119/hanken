@@ -299,3 +299,27 @@ test('再生時間を取れなくても、除かずに選ぶ', async () => {
   assert.equal(res.status, 200);
   assert.equal((await res.json()).tracks[0].videoId, 'a');
 });
+
+test('検索結果の HTML の文字参照を戻してから照合・保存する', async () => {
+  const { deps, db } = makeDeps({
+    env, tables: base([trk('t1', "Don't Stop & Go")]),
+    fetchMap: router({ search: { items: [{ id: { videoId: 'e1' }, snippet: { title: 'Don&#39;t Stop &amp; Go', channelTitle: 'バンドA - Topic' } }] } }),
+  });
+  const j = await (await handle(post({ playlistId: PL }), deps)).json();
+  assert.deepEqual(j.tracks, [{ id: 't1', videoId: 'e1', videoTitle: "Don't Stop & Go" }]);
+  assert.equal(db.tables.playlist_tracks[0].video_title, "Don't Stop & Go");
+  assert.equal(db.tables.video_cache[0].video_title, "Don't Stop & Go");
+});
+
+test('video_cache から写すときは、cache の元の確認時刻を引き継ぐ（今の時刻にしない）', async () => {
+  const fetchedAt = daysAgo(29);
+  const { deps, db } = makeDeps({
+    env,
+    tables: base([trk('t1', '曲1'), trk('t2', '曲1')], {
+      video_cache: [{ artist_key: 'バンドa', title_key: '曲1', video_id: 'c1', video_title: 'C1', fetched_at: fetchedAt }],
+    }),
+    fetchMap: router(),
+  });
+  await handle(post({ playlistId: PL }), deps);
+  assert.deepEqual(db.tables.playlist_tracks.map((r) => r.video_checked_at), [fetchedAt, fetchedAt]);
+});
