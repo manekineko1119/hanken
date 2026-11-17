@@ -1,7 +1,7 @@
 import { prelude, readJson, json, errorJson } from '../_shared/http.js';
 import { normalizeName, titleKey } from '../_shared/normalize.js';
 import { LIMITS } from '../_shared/quota.js';
-import { getSearchUsage, recordSearch, recordUnits } from '../_shared/usage.js';
+import { getSearchUsage, incrementUsage } from '../_shared/usage.js';
 import { pickVideo } from '../_shared/youtube-pick.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -73,25 +73,24 @@ export async function handle(req, deps) {
 
     const isStale = (t) => t.video_id && !(Date.parse(t.video_checked_at) > nowMs - FRESH_MS);
     const stale = tracks.filter(isStale);
-    let need = tracks.filter((t) => !t.video_id);
+    const need = tracks.filter((t) => !t.video_id);
+    const dead = new Map(); // 消えていた動画の ID（video_cache に残っていても使わない）
     const key = deps.env('YT_API_KEY');
-    let usage = null;
-    const loadUsage = async () => (usage ??= await getSearchUsage(deps.db, user.id, now));
+    let userCount = null; // 今日のこの人の検索回数（わかっているとき）
 
     // 30日を過ぎた曲：videos.list だけで確かめ、消えていた曲だけ検索に回す。
     if (stale.length > 0) {
       if (!key) throw upstream('YouTube の API キーが設定されていません');
-      await loadUsage();
       const alive = new Map();
       const ids = [...new Set(stale.map((t) => t.video_id))];
       for (let i = 0; i < ids.length; i += 50) {
         const batch = ids.slice(i, i + 50);
-        usage = await recordUnits(deps.db, now, usage, 1);
+        userCount = (await incrementUsage(deps.db, user.id, now, { units: 1 })).user;
         for (const [id, title] of await checkVideos(deps, key, batch)) alive.set(id, title);
       }
       for (const t of stale) {
         if (alive.has(t.video_id)) await setVideo(t, { videoId: t.video_id, title: alive.get(t.video_id) });
-        else need.push(t);
+        else { dead.set(t.id, t.video_id); need.push(t); }
       }
     }
 
@@ -106,16 +105,23 @@ export async function handle(req, deps) {
       if (hit === undefined) {
         const c = await deps.db.from('video_cache').select('*').eq('artist_key', aKey).eq('title_key', tKey).maybeSingle();
         if (c.error) throw upstream('動画の記録を読めませんでした');
-        if (c.data && Date.parse(c.data.fetched_at) > nowMs - FRESH_MS) {
+        const isDead = c.data?.video_id && c.data.video_id === dead.get(t.id);
+        if (c.data && Date.parse(c.data.fetched_at) > nowMs - FRESH_MS && !isDead) {
           hit = c.data.video_id ? { videoId: c.data.video_id, title: c.data.video_title ?? '' } : null;
         }
       }
       if (hit === undefined) {
+        if (quotaHit) continue; // 枠を超えたあとも、cache にある曲は埋める
         if (!key) throw upstream('YouTube の API キーが設定されていません');
-        await loadUsage();
-        if (usage.user >= LIMITS.search) { quotaHit = 'user'; break; }
-        if (usage.global >= LIMITS.globalSearch) { quotaHit = 'global'; break; }
-        usage = await recordSearch(deps.db, user.id, now, usage);
+        // 先に足して、上限を超えていたら戻す（同時に呼ばれても、上限を超えて検索しない）。
+        const after = await incrementUsage(deps.db, user.id, now, { searches: 1 });
+        userCount = after.user;
+        const over = after.user > LIMITS.search ? 'user' : after.global > LIMITS.globalSearch ? 'global' : null;
+        if (over) {
+          userCount = (await incrementUsage(deps.db, user.id, now, { searches: -1 })).user;
+          quotaHit = over;
+          continue;
+        }
         const picked = pickVideo(await searchVideos(deps, key, t.artist_name, t.title), t.artist_name);
         hit = picked ? { videoId: picked.videoId, title: picked.title } : null;
         const up = await deps.db.from('video_cache').upsert({
@@ -128,14 +134,19 @@ export async function handle(req, deps) {
       await setVideo(t, hit);
     }
 
-    if (quotaHit === 'user') return err('QUOTA', '今日はこれ以上曲を探せません（1日30回まで）。ここまでの結果は保存しました', 429);
-    if (quotaHit === 'global') return err('QUOTA', '今日はこれ以上曲を探せません。ここまでの結果は保存しました', 429);
-
-    const left = Math.max(0, LIMITS.search - (usage ? usage.user : (await loadUsage()).user));
-    return json({
+    userCount ??= (await getSearchUsage(deps.db, user.id, now)).user;
+    const result = {
       tracks: tracks.map((t) => ({ id: t.id, ...state.get(t.id) })),
-      searchesLeft: left,
-    }, 200, origin, deps.env);
+      searchesLeft: Math.max(0, LIMITS.search - userCount),
+    };
+    // 枠を超えたときも、ここまでの結果を返す（クライアントが「枠切れ」と「見つからない」を見分けられるように）。
+    if (quotaHit) {
+      const message = quotaHit === 'user'
+        ? '今日はこれ以上曲を探せません（1日30回まで）。ここまでの結果は保存しました'
+        : '今日はこれ以上曲を探せません。ここまでの結果は保存しました';
+      return json({ error: { code: 'QUOTA', message }, ...result }, 429, origin, deps.env);
+    }
+    return json(result, 200, origin, deps.env);
   } catch (e) {
     if (e?.code === 'UPSTREAM') return err('UPSTREAM', e.message, 502);
     throw e;
