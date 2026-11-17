@@ -69,7 +69,14 @@ export async function getAccessToken(admin, userId, deps) {
   }
   if (!res.ok) {
     if (body?.error === 'invalid_grant') {
-      await admin.from('youtube_connections').delete().eq('user_id', userId);
+      let delErr = null;
+      try {
+        ({ error: delErr } = await admin.from('youtube_connections').delete().eq('user_id', userId));
+      } catch {
+        delErr = true;
+      }
+      // 行が残ると「つながっている」と見え続けるので、消せたときだけ YT_RECONNECT にする。
+      if (delErr) throw codedError('UPSTREAM', 'YouTube の古い鍵を消せませんでした');
       throw codedError('YT_RECONNECT', 'YouTube の許可が切れました。つなぎ直してください');
     }
     throw codedError('UPSTREAM', 'YouTube の鍵を更新できませんでした');
