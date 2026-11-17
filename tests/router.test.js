@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseHash } from '../src/router.js';
+import { parseHash, playlistHref } from '../src/router.js';
 
 test('ライブの詳細：パラメータとクエリを取り出す', () => {
   assert.deepEqual(parseHash('#/live/abc?confirm=1'), {
@@ -16,6 +16,16 @@ test('プレイリストの編集', () => {
     params: { id: 'p1' },
     query: {},
   });
+});
+
+test('プレイリストの保存確認：従来のハッシュを使い、ID をエンコードする', () => {
+  assert.equal(playlistHref('abc-123', { confirm: true }), '#/playlist/abc-123?confirm=1');
+  assert.equal(playlistHref('a b', { confirm: true }), '#/playlist/a%20b?confirm=1');
+});
+
+test('URLSearchParams.size がなくても保存確認と一覧の戻り先を残す', (t) => {
+  t.mock.getter(URLSearchParams.prototype, 'size', () => undefined);
+  assert.equal(playlistHref('p1', { fromPrep: true, confirm: true }), '#/playlist/p1?confirm=1&from=prep');
 });
 
 test('空や知らないパスは /lives に戻す', () => {

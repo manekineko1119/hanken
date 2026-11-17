@@ -1,14 +1,16 @@
 import { el, setChildren, backLink, loadView } from '../ui/dom.js';
 import { getPlaylist, resolveVideos, savePlaylist } from '../data/playlists.js';
 import { getStatus, connect } from '../data/youtube.js';
-import { splitTracks, saveSummary, saveErrorInfo, resolveErrorInfo, cleanName, confirmReturnTo } from '../core/save-confirm.js';
+import { splitTracks, saveSummary, saveErrorInfo, resolveErrorInfo, cleanName } from '../core/save-confirm.js';
+import { playlistHref } from '../router.js';
 
 const CONNECT_FAILED = 'YouTube につなげませんでした。もう一度試してください';
 
 // 保存の確認の画面：名前・入れる曲・見つからなかった曲・非公開、を見せて、OK のあとで保存する。
 export function renderPlaylistConfirm(container, ctx) {
   const id = ctx.params.id;
-  const backHref = `#/playlist/${encodeURIComponent(id)}`;
+  const fromPrep = ctx.query?.from === 'prep';
+  const backHref = playlistHref(id, { fromPrep });
   const load = async () => {
     const [pl, status] = await Promise.all([getPlaylist(id), getStatus()]);
     return { pl, status };
@@ -27,7 +29,7 @@ export function renderPlaylistConfirm(container, ctx) {
 
     const reconnect = async () => {
       try {
-        await connect(confirmReturnTo(id));
+        await connect(playlistHref(id, { fromPrep, confirm: true }));
       } catch {
         if (!ctx.alive()) return;
         message = CONNECT_FAILED;
@@ -56,6 +58,7 @@ export function renderPlaylistConfirm(container, ctx) {
         needReconnect = info.reconnect;
       }
       saving = false;
+      if (result) ctx.onPlaylistSaved?.();
       if (!ctx.alive()) return;
       draw();
       if (needReconnect) reconnect();

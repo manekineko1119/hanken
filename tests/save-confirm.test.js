@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { splitTracks, saveSummary, saveErrorInfo, resolveErrorInfo, cleanName, confirmReturnTo } from '../src/core/save-confirm.js';
+import { splitTracks, saveSummary, saveErrorInfo, resolveErrorInfo, cleanName } from '../src/core/save-confirm.js';
 
 const tracks = [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }, { id: 'c', title: 'C' }];
 
@@ -80,11 +80,6 @@ test('cleanName: 前後の空白を除く。空なら null', () => {
 test('cleanName: 150文字を超える名前は断る', () => {
   assert.equal(cleanName('a'.repeat(151)), null);
   assert.equal(cleanName('a'.repeat(150)).length, 150);
-});
-
-test('confirmReturnTo: 確認の画面へ戻るハッシュ', () => {
-  assert.equal(confirmReturnTo('abc-123'), '#/playlist/abc-123?confirm=1');
-  assert.equal(confirmReturnTo('a b'), '#/playlist/a%20b?confirm=1');
 });
 
 test('saveErrorInfo: BUSY（保存中）はサーバーの文言を出し、つなぎ直さない', () => {

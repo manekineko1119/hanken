@@ -48,16 +48,35 @@ export function trashIcon() {
 
 // 読み込み中 → 成功なら build(data)、失敗なら読み込みエラーを出す。
 // 画面が切り替わったあとに終わった読み込みは捨てる（ctx.alive）。
+// チラつきを防ぐため、読み込みが LOADING_DELAY_MS より早く終われば「読み込み中…」は出さず、
+// それまでは前の中身を押せない状態（inert）で残しておく。
+const LOADING_DELAY_MS = 300;
+
+export function setBusy(container, busy) {
+  container.inert = busy;
+  if (busy) container.setAttribute?.('aria-busy', 'true');
+  else container.removeAttribute?.('aria-busy');
+}
+
 export async function loadView(container, ctx, load, build) {
-  container.replaceChildren(el('p', { class: 'note', text: '読み込み中…' }));
+  setBusy(container, true);
+  const timer = setTimeout(() => {
+    if (ctx.alive()) container.replaceChildren(el('p', { class: 'note', text: '読み込み中…' }));
+  }, LOADING_DELAY_MS);
   let data;
+  let failed = false;
   try {
     data = await load();
   } catch {
-    if (ctx.alive()) {
-      container.replaceChildren(el('p', { class: 'note error', role: 'alert', text: '読み込めませんでした。通信を確かめてください' }));
-    }
+    failed = true;
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!ctx.alive()) return;
+  setBusy(container, false);
+  if (failed) {
+    container.replaceChildren(el('p', { class: 'note error', role: 'alert', text: '読み込めませんでした。通信を確かめてください' }));
     return;
   }
-  if (ctx.alive()) build(data);
+  build(data);
 }

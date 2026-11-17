@@ -1,5 +1,6 @@
 import { el, setChildren, backLink } from '../ui/dom.js';
 import { loadContext, createFor, orderedCandidates, NOT_FOUND } from './prep-flow.js';
+import { playlistHref } from '../router.js';
 
 export async function renderArtistPick(container, ctx) {
   const c = loadContext();
@@ -32,7 +33,7 @@ export async function renderArtistPick(container, ctx) {
       msg.hidden = true;
       try {
         const id = await createFor(c, cand.id);
-        if (ctx.alive()) location.hash = `#/playlist/${encodeURIComponent(id)}`;
+        if (ctx.alive()) location.hash = playlistHref(id, { fromPrep: !c.liveId });
       } catch (err) {
         if (!ctx.alive()) return;
         msg.textContent = err.message;

@@ -56,3 +56,11 @@ export function parseHash(hash) {
   if (!found) return { path: FALLBACK, params: {}, query: {} };
   return { path: found.path, params: found.params, query };
 }
+
+export function playlistHref(id, { fromPrep = false, confirm = false } = {}) {
+  const query = new URLSearchParams();
+  if (confirm) query.set('confirm', '1');
+  if (fromPrep) query.set('from', 'prep');
+  const suffix = query.toString();
+  return `#/playlist/${encodeURIComponent(id)}${suffix ? `?${suffix}` : ''}`;
+}
