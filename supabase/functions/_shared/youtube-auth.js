@@ -50,8 +50,8 @@ export async function getAccessToken(admin, userId, deps) {
   try {
     refresh = await decrypt(row.refresh_token_enc, keyB64);
   } catch {
-    await admin.from('youtube_connections').delete().eq('user_id', userId);
-    throw codedError('YT_RECONNECT', 'YouTube の鍵を読めませんでした。つなぎ直してください');
+    // 鍵（YT_TOKEN_KEY）の設定ミスでも起きるので、行は消さない（消してよいのは invalid_grant のときだけ）。
+    throw codedError('UPSTREAM', 'YouTube の鍵を読めませんでした。設定を確かめてください');
   }
 
   let res;
