@@ -77,7 +77,10 @@ function shouldHandle(url, method, origin) {
 self.addEventListener('install', function (event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function (cache) {
-      return cache.addAll(PRECACHE_URLS);
+      // HTTP キャッシュ（GitHub Pages は max-age=600）の古いファイルを入れないよう、毎回取り直す
+      return cache.addAll(PRECACHE_URLS.map(function (u) {
+        return new Request(u, { cache: 'reload' });
+      }));
     }).then(function () {
       return self.skipWaiting();
     }),
@@ -103,7 +106,7 @@ self.addEventListener('fetch', function (event) {
   var req = event.request;
   if (!shouldHandle(req.url, req.method, self.location.origin)) return;
   event.respondWith(
-    fetch(req).catch(function () {
+    fetch(req, { cache: 'no-cache' }).catch(function () {
       return caches.open(CACHE_NAME).then(function (cache) {
         return cache.match(req, { ignoreSearch: true });
       }).then(function (hit) {
