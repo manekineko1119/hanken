@@ -92,7 +92,15 @@ input[type="text"], input[type="date"], textarea {
 }
 
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.back { display: inline-flex; align-items: center; min-height: 44px; }
+.back {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 44px; padding-right: 12px;
+  font-family: var(--mincho); font-size: 15px; letter-spacing: 0.03em;
+  color: var(--muted); text-decoration: none;
+}
+.back::before { content: '‹'; font-size: 24px; line-height: 1; color: var(--accent); }
+.back:hover { color: var(--text); }
+.back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 .note { color: var(--muted); margin: 8px 0; }
 .error { color: var(--danger); }
 .meta { margin: 0 0 8px; font-family: var(--mincho); font-size: 16px; color: var(--text); }
@@ -180,20 +188,15 @@ input[type="text"], input[type="date"], textarea {
 .on-paper .status { color: var(--ink-soft); }
 .on-paper .status-saved { color: var(--rain); }
 
-/* 「最新」の印：小さな紙の札 */
-.badge-latest {
-  display: inline-block;
-  padding: 0 8px;
-  border-radius: 3px;
-  background: var(--paper);
-  color: var(--ink);
-  font-family: var(--mincho);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.7;
-  white-space: nowrap;
+.filters { display: grid; gap: 8px; margin: 8px 0 12px; }
+.control { display: block; }
+select {
+  width: 100%; min-height: 44px; padding: 8px 12px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); color: var(--text); font: inherit;
 }
-
+.row-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin: 0; padding: 0 0 12px; }
+.row-status a { min-height: 44px; display: inline-flex; align-items: center; font-size: 14px; }
 .field { margin: 16px 0; }
 .label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 4px; }
 .artist-edit { flex-wrap: wrap; display: flex; align-items: center; gap: 4px; padding: 6px 0; }

@@ -31,7 +31,7 @@ export async function createPrepDraft({ liveId, liveArtistId, artistName, itunes
 export async function getPlaylist(id) {
   const db = getClient();
   const { data, error } = await db.from('playlists')
-    .select('id, kind, live_id, live_artist_id, artist_name, itunes_artist_id, title, status, candidates')
+    .select('id, kind, live_id, live_artist_id, artist_name, itunes_artist_id, title, status, candidates, saved_at, edited_at, youtube_playlist_id')
     .eq('id', id).maybeSingle();
   if (error) throw error;
   if (!data) return null;
@@ -52,12 +52,17 @@ export async function saveTracks(id, tracks, rest) {
   }));
 }
 
-export async function listPrepOnly() {
+// 自分のプレイリストを全部（ライブの予習も、予習だけも。下書きも保存済みも）。並び替え・絞り込みは src/core/playlist-list.js。
+export async function listPlaylists() {
   const { data, error } = await getClient().from('playlists')
-    .select('id, title, tracks:playlist_tracks(count)')
-    .eq('kind', 'prep').is('live_id', null).order('created_at', { ascending: false });
+    .select('id, title, artist_name, status, youtube_playlist_id, created_at, live:lives(date, venue)')
+    .eq('kind', 'prep').order('created_at', { ascending: false });
   if (error) throw error;
-  return data.map((p) => ({ id: p.id, title: p.title, count: p.tracks?.[0]?.count ?? 0 }));
+  return data.map((p) => ({
+    id: p.id, title: p.title, artistName: p.artist_name, status: p.status,
+    youtubePlaylistId: p.youtube_playlist_id, createdAt: p.created_at,
+    live: p.live ? { date: p.live.date, venue: p.live.venue } : null,
+  }));
 }
 
 // ライブの出演者ごとの予習の id（なければ入っていない）。
