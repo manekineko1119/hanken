@@ -8,6 +8,13 @@ export function pickArtist(query, candidates) {
   return hits.length === 1 ? hits[0] : null;
 }
 
+// 予習のアーティスト名：選んだ iTunes の候補の正式な名前（YouTube・Last.fm の検索とプレイリスト名に使う）。
+// 入力した名前（ひらがな読みなど）のままだと、YouTube で本人の曲が見つからないことがある。
+export function prepArtistName(typed, candidate) {
+  const n = typeof candidate?.name === 'string' ? candidate.name.trim() : '';
+  return n || typed;
+}
+
 // 完全一致 → 名前に query を含む（または逆）→ そのほか。同じ組の中は元の順。
 export function orderArtists(query, candidates) {
   const q = normalizeName(query);

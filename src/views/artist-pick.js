@@ -32,7 +32,7 @@ export async function renderArtistPick(container, ctx) {
       buttons.forEach((x) => { x.disabled = true; });
       msg.hidden = true;
       try {
-        const id = await createFor(c, cand.id);
+        const id = await createFor(c, cand);
         if (ctx.alive()) location.hash = playlistHref(id, { fromPrep: !c.liveId });
       } catch (err) {
         if (!ctx.alive()) return;
