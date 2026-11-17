@@ -384,3 +384,15 @@ test('callback: つなぎ直し（既存の行）は上書きされる', async (
   assert.equal(row.connected_at, NOW.toISOString());
   assert.equal(await decrypt(row.refresh_token_enc, KEY), 'rt1');
 });
+
+// ---- fix round 2 ----
+test('getAccessToken: invalid_grant で行の削除が失敗（error / throw）したら UPSTREAM で行は残る', async () => {
+  const grant = { [TOKEN_URL]: { status: 400, body: { error: 'invalid_grant' } } };
+  for (const del of [() => ({ eq: async () => ({ error: { message: 'x' } }) }), () => ({ eq: async () => { throw new Error('db'); } })]) {
+    const db = makeDb({ youtube_connections: [await connRow()] });
+    const orig = db.from;
+    db.from = (t) => (t === 'youtube_connections' ? { ...orig(t), delete: del } : orig(t));
+    await assert.rejects(getAccessToken(db, 'u1', mk(db, grant).deps), (e) => e.code === 'UPSTREAM');
+    assert.equal(db.t.youtube_connections.length, 1);
+  }
+});
