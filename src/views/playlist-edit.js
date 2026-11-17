@@ -32,8 +32,6 @@ function trackRow(t, i, tracks, on, editing, busy) {
   const li = el('li', { class: 'artist-row editing' },
     handle,
     el('span', { class: 'artist-name', text: `${i + 1}. ${t.title}` }),
-    btn('↑', `${t.title} を上へ`, () => on.move(i, 'up'), busy || i === 0 || t.isLatest),
-    btn('↓', `${t.title} を下へ`, () => on.move(i, 'down'), busy || i === tracks.length - 1 || t.isLatest || tracks[i + 1]?.isLatest),
     btn('消す', `${t.title} を消す`, () => on.remove(i), busy, 'danger'));
   return { li, handle };
 }
