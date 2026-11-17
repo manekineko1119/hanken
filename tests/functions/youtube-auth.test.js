@@ -396,3 +396,18 @@ test('getAccessToken: invalid_grant で行の削除が失敗（error / throw）�
     assert.equal(db.t.youtube_connections.length, 1);
   }
 });
+
+test('callback: APP_ORIGIN がサブパス付き（GitHub Pages）なら、そのサブパスの下へ戻す', async () => {
+  for (const app of ['https://user.github.io/hanken', 'https://user.github.io/hanken/']) {
+    const db = makeDb({ oauth_states: [stateRow()] });
+    const { deps } = mk(db, googleOk);
+    const env = deps.env;
+    deps.env = (k) => (k === 'APP_ORIGIN' ? app : env(k));
+    const res = await callback(cbReq('code=abc&state=st1'), deps);
+    assert.equal(loc(res), 'https://user.github.io/hanken/#/playlist/p1?confirm=1');
+    const db2 = makeDb();
+    const { deps: d2 } = mk(db2, googleOk);
+    d2.env = (k) => (k === 'APP_ORIGIN' ? app : env(k));
+    assert.equal(loc(await callback(cbReq('code=abc'), d2)), 'https://user.github.io/hanken/#/settings?yt=error');
+  }
+});

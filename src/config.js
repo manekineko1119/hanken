@@ -5,8 +5,8 @@ export function pickConfig(hostname) {
     // Supabase CLI の固定のローカル用 publishable key（公開されている値）。
     return { url: 'http://127.0.0.1:55321', key: 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH' };
   }
-  // 本番の値はデプロイ時に入れる（Task 17）。
-  return { url: '', key: '' };
+  // 本番（GitHub Pages）。publishable key は公開してよい値。
+  return { url: 'https://zggkdnisdkspuwbelflo.supabase.co', key: 'sb_publishable_7_aem7wuSAl15JcUS1ikOw_3I6H5PUO' };
 }
 
 const picked = pickConfig(globalThis.location?.hostname);

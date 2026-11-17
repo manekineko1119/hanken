@@ -8,7 +8,15 @@ const LOCAL_ORIGINS = ['http://localhost:8080', 'http://127.0.0.1:8080'];
 export function corsHeaders(origin, env) {
   const allowed = [...LOCAL_ORIGINS];
   const app = env?.('APP_ORIGIN');
-  if (app) allowed.push(app.replace(/\/+$/, ''));
+  // APP_ORIGIN は GitHub Pages のサブパス込みの URL（例 https://user.github.io/hanken）でもよい。
+  // ブラウザの Origin はパスを持たないので、オリジンの部分だけで比べる。読めない値は許可しない。
+  if (app) {
+    try {
+      allowed.push(new URL(app).origin);
+    } catch {
+      // 設定の誤り。ローカル以外は許可しない
+    }
+  }
   const h = { Vary: 'Origin' };
   if (origin && allowed.includes(origin)) {
     h['Access-Control-Allow-Origin'] = origin;
