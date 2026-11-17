@@ -251,3 +251,11 @@ select {
   border: 0; background: transparent; color: var(--muted);
 }
 .artist-row.editing button.trash:hover, .artist-row.editing button.trash:focus-visible { color: var(--danger); }
+
+/* ≡ のつまみ：枠も地もなく、ふだんは控えめな色。押せる大きさ（44px）は保つ */
+.artist-row.editing button.handle {
+  width: 44px; min-width: 44px; padding: 0;
+  border: 0; background: transparent; color: var(--muted);
+}
+.artist-row.editing button.handle:hover, .artist-row.editing button.handle:active { color: var(--text); }
+.artist-row.editing button.handle:disabled { opacity: 0.35; cursor: default; }
