@@ -61,7 +61,10 @@ a:not(.button):not(.back):not(.row) {
   text-underline-offset: 3px;
 }
 a:not(.button):not(.back):not(.row):hover { color: var(--text); text-decoration-color: var(--text); }
-a:focus-visible { border-radius: 2px; }
+a:focus-visible { border-radius: 4px; }
+.on-paper a { color: var(--ink); }
+.on-paper a:not(.button):not(.back):not(.row) { text-decoration-color: var(--perf); }
+.on-paper a:not(.button):not(.back):not(.row):hover { color: var(--ink-soft); text-decoration-color: var(--ink-soft); }
 a[target="_blank"]:not(.button)::after { content: '↗'; margin-left: 2px; font-size: 0.85em; }
 
 button, .button {

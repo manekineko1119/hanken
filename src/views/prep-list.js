@@ -23,11 +23,17 @@ function liveText(live) {
 
 function row(p) {
   const url = youtubeMusicUrl(p.youtubePlaylistId);
+  const info = [
+    el('span', { class: 'row-title', text: p.title }),
+    el('span', { class: 'row-sub', text: p.artistName }),
+    el('span', { class: 'row-sub', text: liveText(p.live) }),
+  ];
+  // セトリの画面は Task 20 で作る。それまでは、リンクにせず「準備中」と出す（予習の編集画面は「見つかりません」になるため）。
+  if (p.kind === 'setlist') {
+    return el('li', {}, el('div', { class: 'row' }, ...info, el('span', { class: 'row-sub', text: 'セトリの画面は準備中です' })));
+  }
   return el('li', {},
-    el('a', { class: 'row', href: `#/playlist/${encodeURIComponent(p.id)}` },
-      el('span', { class: 'row-title', text: p.title }),
-      el('span', { class: 'row-sub', text: p.artistName }),
-      el('span', { class: 'row-sub', text: liveText(p.live) })),
+    el('a', { class: 'row', href: `#/playlist/${encodeURIComponent(p.id)}` }, ...info),
     p.status === 'saved'
       ? el('p', { class: 'row-status' },
         el('span', { class: 'status status-saved', text: '保存済み' }),
@@ -44,18 +50,19 @@ function select(label, options, value, onChange) {
 
 export function renderPrep(container, ctx) {
   loadView(container, ctx, listPlaylists, (items) => {
-    const pref = loadPref();
+    // プレイリストが1つもないときは条件の欄を出さないので、覚えていた条件も使わない。
+    const pref = items.length ? loadPref() : normalizePref(null);
     const listBox = el('div', {});
     const drawList = () => {
       const shown = sortPlaylists(filterPlaylists(items, pref), pref.sort);
       setChildren(listBox,
         shown.length
           ? el('ul', { class: 'list' }, ...shown.map(row))
-          : el('p', { class: 'note', text: pref.kind === 'setlist' ? 'セトリはまだありません' : items.length ? '条件に合うプレイリストがありません' : 'まだありません' }));
+          : el('p', { class: 'note', text: pref.kind === 'setlist' && !items.some((p) => p.kind === 'setlist') ? 'セトリはまだありません' : items.length ? '条件に合うプレイリストがありません' : 'まだありません' }));
     };
     const change = (patch) => { Object.assign(pref, patch); savePref(pref); drawList(); };
 
-    const search = el('input', { type: 'text', maxlength: '100', class: 'filter-search', placeholder: '探す（アーティスト・題名）', 'aria-label': 'アーティスト名・タイトルで絞る', value: pref.text });
+    const search = el('input', { type: 'text', maxlength: '100', class: 'filter-search', placeholder: '探す', 'aria-label': 'アーティスト名・タイトルで絞る', value: pref.text });
     search.addEventListener('input', () => change({ text: search.value }));
 
     const input = el('input', { type: 'text', maxlength: '100', placeholder: 'アーティスト名', 'aria-label': 'アーティスト名' });
