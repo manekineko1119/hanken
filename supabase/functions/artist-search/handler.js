@@ -17,10 +17,11 @@ export async function handle(req, deps) {
     const res = await deps.fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`status ${res.status}`);
     data = await res.json();
+    if (!Array.isArray(data?.results)) throw new Error('bad shape');
   } catch {
     return errorJson('UPSTREAM', 'iTunes から候補を取れませんでした', 502, origin, deps.env);
   }
-  const candidates = (data?.results ?? [])
+  const candidates = data.results
     .filter((r) => r && r.artistId != null && r.artistName)
     .map((r) => ({ id: r.artistId, name: r.artistName, genre: r.primaryGenreName ?? '' }));
   return json({ candidates }, 200, origin, deps.env);
