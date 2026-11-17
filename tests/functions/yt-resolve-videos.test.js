@@ -160,3 +160,101 @@ test('YouTube の検索が失敗したら UPSTREAM', async () => {
   assert.equal(res.status, 502);
   assert.equal((await res.json()).error.code, 'UPSTREAM');
 });
+
+test('消えていた動画が video_cache に残っていても使わず、検索して cache を置き換える', async () => {
+  const { deps, calls, db } = makeDeps({
+    env,
+    tables: base([trk('t1', '曲1', { video_id: 'dead', video_title: 'x', video_checked_at: daysAgo(40) })], {
+      video_cache: [{ artist_key: 'バンドa', title_key: '曲1', video_id: 'dead', video_title: 'x', fetched_at: daysAgo(3) }],
+    }),
+    fetchMap: router({ list: listItems(), search: searchItems(['fresh', 'ファン']) }),
+  });
+  const j = await (await handle(post({ playlistId: PL }), deps)).json();
+  assert.equal(searchCalls(calls).length, 1);
+  assert.deepEqual(j.tracks, [{ id: 't1', videoId: 'fresh', videoTitle: 'T-fresh' }]);
+  assert.equal(db.tables.video_cache.length, 1);
+  assert.equal(db.tables.video_cache[0].video_id, 'fresh');
+});
+
+test('30日を過ぎた video_cache は使わず、検索する', async () => {
+  const { deps, calls } = makeDeps({
+    env,
+    tables: base([trk('t1', '曲1')], {
+      video_cache: [{ artist_key: 'バンドa', title_key: '曲1', video_id: 'old', video_title: 'O', fetched_at: daysAgo(31) }],
+    }),
+    fetchMap: router({ search: searchItems(['n', 'ファン']) }),
+  });
+  const j = await (await handle(post({ playlistId: PL }), deps)).json();
+  assert.equal(searchCalls(calls).length, 1);
+  assert.equal(j.tracks[0].videoId, 'n');
+});
+
+test('同じ曲が2つあっても、検索は1回', async () => {
+  const { deps, calls } = makeDeps({ env, tables: base([trk('t1', '曲1'), trk('t2', '曲1')]), fetchMap: router() });
+  const j = await (await handle(post({ playlistId: PL }), deps)).json();
+  assert.equal(searchCalls(calls).length, 1);
+  assert.deepEqual(j.tracks.map((t) => t.videoId), ['s1', 's1']);
+  assert.equal(j.searchesLeft, 29);
+});
+
+test('29回使用済みなら、もう1回だけ検索できて searchesLeft は 0', async () => {
+  const { deps, calls } = makeDeps({
+    env, tables: base([trk('t1', '曲1')], { user_daily_usage: [{ user_id: 'u1', day_jst: '2026-11-17', kind: 'search', count: 29 }] }),
+    fetchMap: router(),
+  });
+  const res = await handle(post({ playlistId: PL }), deps);
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).searchesLeft, 0);
+  assert.equal(searchCalls(calls).length, 1);
+});
+
+test('途中で枠が切れても、ここまでの結果は保存され、QUOTA の本文に入る。cache の曲は枠切れのあとも埋まる', async () => {
+  const { deps, calls, db } = makeDeps({
+    env,
+    tables: base([trk('t1', '曲1'), trk('t2', '曲2'), trk('t3', '曲3')], {
+      user_daily_usage: [{ user_id: 'u1', day_jst: '2026-11-17', kind: 'search', count: 29 }],
+      video_cache: [{ artist_key: 'バンドa', title_key: '曲3', video_id: 'c3', video_title: 'C3', fetched_at: daysAgo(1) }],
+    }),
+    fetchMap: router(),
+  });
+  const res = await handle(post({ playlistId: PL }), deps);
+  assert.equal(res.status, 429);
+  const j = await res.json();
+  assert.equal(j.error.code, 'QUOTA');
+  assert.equal(j.searchesLeft, 0);
+  assert.deepEqual(j.tracks, [
+    { id: 't1', videoId: 's1', videoTitle: 'T-s1' },
+    { id: 't2', videoId: null, videoTitle: null },
+    { id: 't3', videoId: 'c3', videoTitle: 'C3' },
+  ]);
+  assert.equal(searchCalls(calls).length, 1);
+  assert.equal(db.tables.playlist_tracks[0].video_id, 's1');
+  // 超えた分は戻してあるので、30回のまま
+  assert.equal(db.tables.user_daily_usage[0].count, 30);
+  assert.equal(db.tables.api_usage[0].searches, 1);
+});
+
+test('枠の確認は、先に足してから行う（足したあとの値で判断し、超えたら戻す）', async () => {
+  const { deps, db } = makeDeps({
+    env, tables: base([trk('t1', '曲1')], { api_usage: [{ day_pt: '2026-11-16', units: 5, searches: 90 }] }),
+    fetchMap: router(),
+  });
+  assert.equal((await handle(post({ playlistId: PL }), deps)).status, 429);
+  assert.deepEqual(db.rpcCalls.map((c) => c.p_searches), [1, -1]);
+  assert.equal(db.tables.api_usage[0].searches, 90);
+  assert.equal(db.tables.api_usage[0].units, 5);
+});
+
+test('videos.list は50件ずつに分ける', async () => {
+  const tracks = Array.from({ length: 55 }, (_, i) => trk(`t${i}`, `曲${i}`, { video_id: `v${i}`, video_title: 'x', video_checked_at: daysAgo(40) }));
+  const { deps, calls, db } = makeDeps({
+    env, tables: base(tracks),
+    fetchMap: router({ list: listItems(...tracks.map((t) => t.video_id)) }),
+  });
+  const res = await handle(post({ playlistId: PL }), deps);
+  assert.equal(res.status, 200);
+  const listCalls = calls.filter((c) => c.includes('/youtube/v3/videos'));
+  assert.deepEqual(listCalls.map((c) => new URL(c).searchParams.get('id').split(',').length), [50, 5]);
+  assert.equal(db.tables.api_usage[0].units, 2);
+  assert.equal(db.tables.api_usage[0].searches, 0);
+});

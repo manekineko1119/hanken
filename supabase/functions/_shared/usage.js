@@ -1,5 +1,6 @@
 // YouTube の枠と、一人あたりの検索回数の数え方（設計 7.1・7.2）。
 // api_usage は太平洋時間の日付、user_daily_usage は日本時間の日付で数える。
+// 足し算は SQL の関数 increment_usage の中で行う（同時に呼ばれても数えもれしない）。
 // service role の db を渡す。Deno 固有の API は使わない。
 import { ptDay, jstDay } from './quota.js';
 
@@ -9,7 +10,7 @@ function fail(message) {
   return e;
 }
 
-// 今日の検索回数：{ user（この人・日本時間）, global（全員・太平洋時間）, units }
+// 今日の検索回数（読むだけ）：{ user（この人・日本時間）, global（全員・太平洋時間）, units }
 export async function getSearchUsage(db, userId, now) {
   const u = await db.from('user_daily_usage').select('count').eq('user_id', userId).eq('day_jst', jstDay(now)).eq('kind', 'search').maybeSingle();
   if (u.error) throw fail('使った回数を確かめられませんでした');
@@ -18,21 +19,13 @@ export async function getSearchUsage(db, userId, now) {
   return { user: u.data?.count ?? 0, global: g.data?.searches ?? 0, units: g.data?.units ?? 0 };
 }
 
-// 検索を1回数える（呼ぶ前に数える。失敗しても Google 側では使われているため）。
-// usage は getSearchUsage の結果。戻り値は、数えたあとの { user, global, units }。
-export async function recordSearch(db, userId, now, usage) {
-  const user = usage.user + 1;
-  const global = usage.global + 1;
-  const r1 = await db.from('user_daily_usage').upsert({ user_id: userId, day_jst: jstDay(now), kind: 'search', count: user });
-  const r2 = await db.from('api_usage').upsert({ day_pt: ptDay(now), units: usage.units, searches: global });
-  if (r1.error || r2.error) throw fail('使った回数を記録できませんでした');
-  return { user, global, units: usage.units };
-}
-
-// 検索以外の単位（videos.list など）を数える。
-export async function recordUnits(db, now, usage, n) {
-  const units = usage.units + n;
-  const r = await db.from('api_usage').upsert({ day_pt: ptDay(now), units, searches: usage.global });
-  if (r.error) throw fail('使った回数を記録できませんでした');
-  return { ...usage, units };
+// 検索の回数と単位を足し、足したあとの { user, global, units } を返す。searches に -1 を渡すと戻せる。
+export async function incrementUsage(db, userId, now, { searches = 0, units = 0 } = {}) {
+  const { data, error } = await db.rpc('increment_usage', {
+    p_user_id: userId, p_day_jst: jstDay(now), p_day_pt: ptDay(now), p_kind: 'search',
+    p_searches: searches, p_units: units,
+  });
+  const row = Array.isArray(data) ? data[0] : data;
+  if (error || !row) throw fail('使った回数を記録できませんでした');
+  return { user: row.user_count, global: row.global_searches, units: row.global_units };
 }

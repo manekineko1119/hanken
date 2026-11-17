@@ -13,16 +13,37 @@ const PK_COLS = {
 export function fakeDb({ users = {}, tables = {}, errors = {} } = {}) {
   const upserts = [];
   const updates = [];
+  const rpcCalls = [];
   const matchAll = (filters) => (r) => filters.every(([c, v]) => r[c] === v);
   const db = {
     upserts,
     updates,
+    rpcCalls,
     tables,
     auth: {
       async getUser(jwt) {
         const user = users[jwt];
         return user ? { data: { user }, error: null } : { data: { user: null }, error: { message: 'invalid' } };
       },
+    },
+    // increment_usage の偽物（SQL 関数と同じ足し方）
+    async rpc(name, a) {
+      if (errors.rpc) return { data: null, error: errors.rpc };
+      if (name !== 'increment_usage') throw new Error('unexpected rpc ' + name);
+      rpcCalls.push(a);
+      const find = (t, pred, make) => {
+        const rows = (tables[t] ??= []);
+        let r = rows.find(pred);
+        if (!r) rows.push((r = make()));
+        return r;
+      };
+      const u = find('user_daily_usage', (r) => r.user_id === a.p_user_id && r.day_jst === a.p_day_jst && r.kind === a.p_kind,
+        () => ({ user_id: a.p_user_id, day_jst: a.p_day_jst, kind: a.p_kind, count: 0 }));
+      const g = find('api_usage', (r) => r.day_pt === a.p_day_pt, () => ({ day_pt: a.p_day_pt, units: 0, searches: 0 }));
+      u.count = Math.max(0, u.count + a.p_searches);
+      g.searches = Math.max(0, g.searches + a.p_searches);
+      g.units = Math.max(0, g.units + a.p_units);
+      return { data: [{ user_count: u.count, global_searches: g.searches, global_units: g.units }], error: null };
     },
     from(table) {
       const filters = [];
