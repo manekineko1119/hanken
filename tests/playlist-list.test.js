@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sortPlaylists, filterPlaylists, needsReflect, youtubeMusicUrl, normalizePref, deleteConfirmText } from '../src/core/playlist-list.js';
+import { sortPlaylists, filterPlaylists, needsReflect, youtubeMusicUrl, normalizePref, deleteConfirmText, renameWhere } from '../src/core/playlist-list.js';
 
 const mk = (id, o = {}) => ({ id, title: `T${id}`, artistName: 'A', status: 'draft', createdAt: '2026-11-01T00:00:00Z', live: null, ...o });
 const a = mk('a', { createdAt: '2026-11-01T00:00:00Z', live: { date: '2026-12-10', venue: 'X' } });
@@ -79,4 +79,13 @@ test('deleteConfirmText：保存していない下書きには YouTube の話を
   const draft = deleteConfirmText({ title: '【予習】あわくもろく', youtubePlaylistId: null });
   assert.match(draft, /元に戻せません/);
   assert.doesNotMatch(draft, /YouTube/);
+});
+
+test("renameWhere：YouTube にまだ保存していなければ、編集の画面でそのまま変える", () => {
+  assert.equal(renameWhere({ youtubePlaylistId: null }), "here");
+  assert.equal(renameWhere({}), "here");
+});
+
+test("renameWhere：YouTube に保存済みなら、保存の確認の画面で変える（YouTube 側の名前もそろえるため）", () => {
+  assert.equal(renameWhere({ youtubePlaylistId: "PLx" }), "confirm");
 });
