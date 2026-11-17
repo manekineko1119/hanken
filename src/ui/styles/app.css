@@ -226,3 +226,9 @@ select {
 #tabbar a[aria-current="page"] { color: var(--paper); font-weight: 700; }
 .artist-warn { flex-basis: 100%; margin: 0; font-size: 14px; }
 .artist-warn[hidden] { display: none; }
+
+/* 並べ替え：≡ のつまみ。つまみの上ではスクロールせず、引きずりに使う */
+.handle { touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; font-size: 20px; padding: 0; }
+.dragging-list { overscroll-behavior: contain; }
+.dragging-list > li:not(.dragging) { transition: transform 0.12s; }
+.artist-row.dragging { position: relative; z-index: 2; background: var(--surface); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5); cursor: grabbing; }

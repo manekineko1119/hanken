@@ -4,21 +4,38 @@ import { renderPlaylistConfirm } from './playlist-confirm.js';
 import { getStatus, connect } from '../data/youtube.js';
 import { confirmReturnTo } from '../core/save-confirm.js';
 import { needsReflect } from '../core/playlist-list.js';
+import { moveTrackTo } from '../core/reorder.js';
+import { attachDrag } from '../ui/drag-reorder.js';
 import { replaceTrack, moveTrack, addManualTrack, hasPopularity } from '../core/prep.js';
 
 const SAVE_FAILED = '保存できませんでした。通信を確かめてください';
 
-function trackRow(t, i, tracks, on) {
-  const btn = (label, fn, disabled) => {
-    const b = el('button', { type: 'button', text: label, disabled });
+// 編集モードでないときは、曲名だけの静かな行。編集モードでは、つまみ（≡）・上へ・下へ・消すが出る。
+// 編集モードのときは { li, handle } を返す。
+function trackRow(t, i, tracks, on, editing, busy) {
+  if (!editing) {
+    return el('li', { class: 'artist-row' }, el('span', { class: 'artist-name', text: `${i + 1}. ${t.title}` }));
+  }
+  const btn = (label, aria, fn, disabled, cls) => {
+    const b = el('button', { type: 'button', class: cls, text: label, 'aria-label': aria, disabled });
     b.addEventListener('click', fn);
     return b;
   };
-  return el('li', { class: 'artist-row' },
+  const handle = el('button', {
+    type: 'button', class: 'handle', text: '≡', disabled: busy || t.isLatest, 'data-index': String(i),
+    'aria-label': `${t.title} を並べ替える（引きずる。矢印キーの上下でも動かせます）`,
+  });
+  handle.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp') { e.preventDefault(); on.move(i, 'up'); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); on.move(i, 'down'); }
+  });
+  const li = el('li', { class: 'artist-row' },
+    handle,
     el('span', { class: 'artist-name', text: `${i + 1}. ${t.title}` }),
-    btn('消す', () => on.remove(i)),
-    btn('↑', () => on.move(i, 'up'), i === 0 || t.isLatest),
-    btn('↓', () => on.move(i, 'down'), i === tracks.length - 1 || t.isLatest || tracks[i + 1]?.isLatest));
+    btn('↑', `${t.title} を上へ`, () => on.move(i, 'up'), busy || i === 0 || t.isLatest),
+    btn('↓', `${t.title} を下へ`, () => on.move(i, 'down'), busy || i === tracks.length - 1 || t.isLatest || tracks[i + 1]?.isLatest),
+    btn('消す', `${t.title} を消す`, () => on.remove(i), busy, 'danger'));
+  return { li, handle };
 }
 
 export function renderPlaylistEdit(container, ctx) {
@@ -34,13 +51,15 @@ export function renderPlaylistEdit(container, ctx) {
     let rest = pl.candidates ?? { popular: [], recent: [] };
     let message = '';
     let busy = false;
+    let editing = false;
+    let focusIdx = null; // 動かしたあと、つまみにフォーカスを戻す行
     // 保存済みで、保存のあとに曲を変えたら、YouTube Music にまだ反映していない。
     let unreflected = needsReflect({ status: pl.status, savedAt: pl.saved_at, editedAt: pl.edited_at });
     const input = el('input', { type: 'text', maxlength: '100', placeholder: '曲名', 'aria-label': '足す曲名' });
 
     // 成功なら true。失敗したら変更前（prev）に戻してエラーを出す（サーバーの状態には頼らない。保存は丸ごと入れ替えなので、失敗なら元のまま）。
     const persist = async (next, nextRest) => {
-      if (busy) return false;
+      if (busy) { focusIdx = null; return false; }
       busy = true;
       const prev = { tracks, rest };
       tracks = next;
@@ -58,6 +77,7 @@ export function renderPlaylistEdit(container, ctx) {
       }
       busy = false;
       if (ctx.alive()) draw();
+      focusIdx = null;
       return ok;
     };
 
@@ -68,6 +88,10 @@ export function renderPlaylistEdit(container, ctx) {
       },
       move: (i, dir) => {
         const next = moveTrack(tracks, i, dir);
+        if (next !== tracks) { focusIdx = i + (dir === 'up' ? -1 : 1); persist(next, rest); }
+      },
+      drop: (from, to) => {
+        const next = moveTrackTo(tracks, from, to);
         if (next !== tracks) persist(next, rest);
       },
     };
@@ -106,6 +130,21 @@ export function renderPlaylistEdit(container, ctx) {
 
     function draw() {
       const typed = input.value;
+      const list = el('ul', { class: 'list' });
+      const latestAt = tracks.findIndex((t) => t.isLatest);
+      const lastMovable = latestAt === -1 ? tracks.length - 1 : latestAt - 1;
+      tracks.forEach((t, i) => {
+        const r = trackRow(t, i, tracks, on, editing, busy);
+        if (r.li) {
+          list.append(r.li);
+          attachDrag(r.handle, r.li, list, { from: i, maxIndex: lastMovable, onDrop: on.drop });
+          if (focusIdx === i) queueMicrotask(() => r.handle.focus());
+        } else {
+          list.append(r);
+        }
+      });
+      const toggle = el('button', { type: 'button', text: editing ? '完了' : '編集', disabled: !editing && tracks.length === 0 });
+      toggle.addEventListener('click', () => { editing = !editing; focusIdx = null; draw(); });
       const save = el('button', { type: 'button', class: 'primary', disabled: busy || tracks.length === 0, text: pl.status === 'saved' ? 'YouTube Music に反映' : 'YouTube Music に保存' });
       save.addEventListener('click', goSave);
       setChildren(container,
@@ -113,11 +152,11 @@ export function renderPlaylistEdit(container, ctx) {
         el('h1', { text: pl.title }),
         unreflected ? el('p', { class: 'note', role: 'status', text: 'YouTube Music にまだ反映していません' }) : null,
         !hasPopularity(tracks, rest) ? el('p', { class: 'note', text: '人気の順のデータがないため、新しい順です' }) : null,
-        el('ul', { class: 'list' }, ...tracks.map((t, i) => trackRow(t, i, tracks, on))),
+        list,
         tracks.length < 10 ? el('p', { class: 'note', text: '候補がもうありません。曲名で探して足せます' }) : null,
         message ? el('p', { class: 'note error', role: 'alert', text: message }) : null,
         el('div', { class: 'artist-edit' }, input, addBtn),
-        el('div', { class: 'actions' }, save));
+        el('div', { class: 'actions' }, save, toggle));
       input.value = typed;
     }
     draw();

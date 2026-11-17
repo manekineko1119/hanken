@@ -46,3 +46,14 @@ test('youtubeMusicUrl', () => {
   assert.equal(youtubeMusicUrl('PL abc'), 'https://music.youtube.com/playlist?list=PL%20abc');
   assert.equal(youtubeMusicUrl(null), null);
 });
+
+test('needsReflect: 時刻の書き方（Z と +00:00）が混ざっても、時刻で比べる', () => {
+  assert.equal(needsReflect({ status: 'saved', savedAt: '2026-11-01T10:00:00Z', editedAt: '2026-11-01T10:00:05.123456+00:00' }), true);
+  assert.equal(needsReflect({ status: 'saved', savedAt: '2026-11-01T10:00:05.5+00:00', editedAt: '2026-11-01T10:00:05Z' }), false);
+  assert.equal(needsReflect({ status: 'saved', savedAt: '2026-11-01T19:00:10+09:00', editedAt: '2026-11-01T10:00:05Z' }), false);
+});
+
+test('needsReflect: 読めない時刻は「反映済み」にしない／editedAt がなければ false', () => {
+  assert.equal(needsReflect({ status: 'saved', savedAt: 'broken', editedAt: '2026-11-01T10:00:05Z' }), true);
+  assert.equal(needsReflect({ status: 'saved', savedAt: '2026-11-01T10:00:05Z', editedAt: 'broken' }), false);
+});
