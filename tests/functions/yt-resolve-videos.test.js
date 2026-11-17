@@ -9,7 +9,12 @@ const trk = (id, title, extra = {}) => ({ id, playlist_id: PL, position: Number(
 const searchItems = (...vs) => ({ items: vs.map(([id, ch]) => ({ id: { videoId: id }, snippet: { title: 'T-' + id, channelTitle: ch } })) });
 const listItems = (...ids) => ({ items: ids.map((id) => ({ id, snippet: { title: 'L-' + id } })) });
 const router = ({ search = searchItems(['s1', 'ファン']), list = listItems() } = {}) => (url) => {
-  if (url.includes('/youtube/v3/search')) return { body: search };
+  // 'T-' で始まるタイトルは、検索した曲名に置き換える（曲名を含まない動画は選ばれないため）。
+  if (url.includes('/youtube/v3/search')) {
+    const track = new URL(url).searchParams.get('q').replace(/^バンドA /, '');
+    const items = search.items.map((i) => ({ ...i, snippet: { ...i.snippet, title: i.snippet.title.startsWith('T-') ? track : i.snippet.title } }));
+    return { body: { items } };
+  }
   if (url.includes('/youtube/v3/videos')) return { body: list };
   throw new Error('unexpected ' + url);
 };
@@ -89,7 +94,7 @@ test('30日を過ぎた曲は videos.list だけで確かめ、消えていた�
   assert.equal(searchCalls(calls).length, 1);
   assert.deepEqual(j.tracks, [
     { id: 't1', videoId: 'alive', videoTitle: 'L-alive' },
-    { id: 't2', videoId: 'new2', videoTitle: 'T-new2' },
+    { id: 't2', videoId: 'new2', videoTitle: '曲2' },
   ]);
   assert.equal(db.tables.playlist_tracks[0].video_checked_at, NOW.toISOString());
   assert.equal(db.tables.api_usage[0].units, 2);
@@ -171,7 +176,7 @@ test('消えていた動画が video_cache に残っていても使わず、検�
   });
   const j = await (await handle(post({ playlistId: PL }), deps)).json();
   assert.equal(searchCalls(calls).length, 1);
-  assert.deepEqual(j.tracks, [{ id: 't1', videoId: 'fresh', videoTitle: 'T-fresh' }]);
+  assert.deepEqual(j.tracks, [{ id: 't1', videoId: 'fresh', videoTitle: '曲1' }]);
   assert.equal(db.tables.video_cache.length, 1);
   assert.equal(db.tables.video_cache[0].video_id, 'fresh');
 });
@@ -223,7 +228,7 @@ test('途中で枠が切れても、ここまでの結果は保存され、QUOTA
   assert.equal(j.error.code, 'QUOTA');
   assert.equal(j.searchesLeft, 0);
   assert.deepEqual(j.tracks, [
-    { id: 't1', videoId: 's1', videoTitle: 'T-s1' },
+    { id: 't1', videoId: 's1', videoTitle: '曲1' },
     { id: 't2', videoId: null, videoTitle: null },
     { id: 't3', videoId: 'c3', videoTitle: 'C3' },
   ]);
@@ -286,7 +291,7 @@ test('再生時間を取れなくても、除かずに選ぶ', async () => {
   const { deps } = makeDeps({
     env, tables: base([trk('t1', '曲1')]),
     fetchMap: (url) => {
-      if (url.includes('/youtube/v3/search')) return { body: searchItems(['a', 'ファン']) };
+      if (url.includes('/youtube/v3/search')) return { body: { items: [{ id: { videoId: 'a' }, snippet: { title: '曲1', channelTitle: 'ファン' } }] } };
       return { status: 500, body: {} };
     },
   });

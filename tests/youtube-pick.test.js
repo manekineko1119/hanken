@@ -19,10 +19,19 @@ test('実際の結果：ローマ字の Topic（曲名が同じ）を選び、�
   assert.equal(pickVideo(REAL, 'ミセカイ', '104Hz').videoId, 't1');
 });
 
-test('Topic がない結果では、ショートも別バージョンも選ばない（最初のショートでない動画になる）', () => {
-  const r = pickVideo(REAL.slice(2), 'ミセカイ', '104Hz');
-  assert.equal(r.videoId, 'o4');
-  assert.notEqual(r.videoId, 's3');
+test('Topic がない結果で、曲名を含む正しい動画がなければ null（別の曲は選ばない）', () => {
+  assert.equal(pickVideo(REAL.slice(2), 'ミセカイ', '104Hz'), null);
+});
+
+test('Topic がなくても、アーティスト名を含まないチャンネルの正しい曲（曲名を含む）は選ぶ', () => {
+  const upload = v('u', 'レーベルX', 'ミセカイ「104Hz」MV', 270);
+  assert.equal(pickVideo([...REAL.slice(2), upload], 'ミセカイ', '104Hz').videoId, 'u');
+});
+
+test('短い名前の Topic（Kai - Topic）は、ミセカイ -Misekai- と同じアーティスト扱いにしない', () => {
+  const kai = v('kai', 'Kai - Topic', '104Hz', 273);
+  assert.equal(pickVideo([kai, OTHER_SONG, v('y', 'ミセカイ公式', '104Hz', 200)], 'ミセカイ', '104Hz').videoId, 'y');
+  assert.equal(pickVideo([kai, TOPIC1, SHORT], 'ミセカイ', '104Hz').videoId, 't1');
 });
 
 test('別のアーティストの Topic は、同じ曲名でも選ばない', () => {
@@ -59,8 +68,9 @@ test('アーティスト名を含まないチャンネルでも、曲名を含�
   assert.equal(pickVideo(items, 'バンドA', '曲1').videoId, '3');
 });
 
-test('どれもなければ、ショートでない先頭。空なら null', () => {
-  assert.equal(pickVideo([v('1', 'x', 'a', 30), v('2', 'y', 'b'), v('3', 'z', 'c')], 'バンドA', '曲1').videoId, '2');
+test('曲名がないときだけ、ショートでない先頭。曲名があって見つからなければ null。空なら null', () => {
+  assert.equal(pickVideo([v('1', 'x', 'a', 30), v('2', 'y', 'b'), v('3', 'z', 'c')], 'バンドA', '').videoId, '2');
+  assert.equal(pickVideo([v('2', 'y', 'b'), v('3', 'z', 'c')], 'バンドA', '曲1'), null);
   assert.equal(pickVideo([], 'バンドA', '曲1'), null);
   assert.equal(pickVideo(undefined, 'バンドA', '曲1'), null);
   assert.equal(pickVideo([v('1', 'x', 'a', 30)], 'バンドA', '曲1'), null);
