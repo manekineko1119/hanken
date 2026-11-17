@@ -198,7 +198,7 @@ test('YouTube につながっていない（鍵が失効）：YT_RECONNECT。回
   assert.equal(res.status, 403);
   assert.equal((await res.json()).error.code, 'YT_RECONNECT');
   assert.equal(reqs.length, 0);
-  assert.equal(db.tables.api_usage[0].units, 0);
+  assert.equal(db.tables.api_usage?.[0]?.units ?? 0, 0);
   assert.equal(db.tables.user_daily_usage.find((r) => r.kind === 'save').count, 0);
 });
 
@@ -220,4 +220,59 @@ test('title を渡さなければ、プレイリストの題名を使う', async
   const { deps, reqs } = await setup({ tracks: [trk(1)], router: happy() });
   await call(deps, { playlistId: PL });
   assert.equal(reqs[0].body.snippet.title, '予習');
+});
+
+test('作り直し：YouTube に残っている本当の項目数で枠を確かめ、足りなければ消さずに QUOTA', async () => {
+  const router = happy((url, init) => {
+    if (url.includes('/playlistItems') && (init.method ?? 'GET') === 'GET') return ok({ items: [1, 2, 3, 4, 5].map((n) => ({ id: 'i' + n })) });
+    return null;
+  });
+  // 下書きは1曲だけ（見積もり 101）。でも YouTube には5つ残っている（見積もり 301）。
+  const { deps, reqs, db } = await setup({
+    tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD', status: 'saved' }, router,
+    tables: { api_usage: [{ day_pt: '2026-11-16', units: 9300, searches: 0 }] },
+  });
+  const res = await call(deps);
+  assert.equal(res.status, 429);
+  assert.equal((await res.json()).error.code, 'QUOTA');
+  assert.deepEqual(yt(reqs), ['GET playlistItems']);
+  assert.equal(db.tables.api_usage[0].units, 9301); // list の1単位だけ残る
+  assert.equal(db.tables.user_daily_usage.find((r) => r.kind === 'save').count, 0);
+  assert.equal(db.tables.playlists[0].status, 'saved');
+});
+
+test('作り直し：残りの項目が多くても、枠に入るなら消して入れ直す', async () => {
+  const router = happy((url, init) => {
+    const m = init.method ?? 'GET';
+    if (url.includes('/playlistItems') && m === 'GET') return ok({ items: [1, 2, 3].map((n) => ({ id: 'i' + n })) });
+    if (m === 'DELETE') return { status: 204, body: null };
+    return null;
+  });
+  const { deps, db } = await setup({ tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD' }, router });
+  assert.equal((await call(deps)).status, 200);
+  assert.equal(db.tables.api_usage[0].units, 1 + 150 + 50);
+});
+
+test('単位の予約に失敗したら、本人の回数も戻す', async () => {
+  const { deps, reqs, db } = await setup({ tracks: [trk(1)], router: happy() });
+  const rpc = db.rpc.bind(db);
+  db.rpc = async (name, a) => (a.p_units > 0 ? { data: null, error: { message: 'boom' } } : rpc(name, a));
+  const res = await call(deps);
+  assert.equal(res.status, 502);
+  assert.equal(reqs.length, 0);
+  assert.equal(db.tables.user_daily_usage.find((r) => r.kind === 'save').count, 0);
+});
+
+test('途中で YouTube が 401 を返したら YT_RECONNECT（inserted を添える）', async () => {
+  const router = happy((url, init) => {
+    if (url.includes('/playlistItems') && init.method === 'POST' && videoOf(init) === 'v2') return { status: 401, body: { error: {} } };
+    return null;
+  });
+  const { deps, db } = await setup({ tracks: [trk(1), trk(2)], router });
+  const res = await call(deps);
+  assert.equal(res.status, 403);
+  const j = await res.json();
+  assert.equal(j.error.code, 'YT_RECONNECT');
+  assert.equal(j.inserted, 1);
+  assert.equal(db.tables.api_usage[0].units, 150);
 });
