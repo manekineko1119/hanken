@@ -37,3 +37,9 @@ test('url-safe base64 の鍵も使える', async () => {
   const urlKey = Buffer.from(new Uint8Array(32).fill(251)).toString('base64url');
   assert.equal(await decrypt(await encrypt('ok', urlKey), urlKey), 'ok');
 });
+
+test('decrypt: 途中で切れた暗号文・不正な文字は失敗', async () => {
+  const t = await encrypt('hello world', KEY);
+  await assert.rejects(decrypt(t.slice(0, 20), KEY));
+  await assert.rejects(decrypt('!!!!' + t.slice(4), KEY));
+});
