@@ -29,7 +29,10 @@ export function renderPlaylistConfirm(container, ctx) {
       try {
         await connect(confirmReturnTo(id));
       } catch {
-        if (ctx.alive()) { message = CONNECT_FAILED; draw(); }
+        if (!ctx.alive()) return;
+        message = CONNECT_FAILED;
+        // 曲の一覧がまだない（未接続など）ときは、つなぐ画面に戻す。「曲を探しています…」のままにしない。
+        if (resolved) draw(); else drawDisconnected();
       }
     };
 
@@ -97,12 +100,17 @@ export function renderPlaylistConfirm(container, ctx) {
       nameInput.value = typed;
     }
 
-    if (!status.connected) {
+    function drawDisconnected() {
       const btn = el('button', { type: 'button', class: 'primary', text: 'YouTube につなぐ' });
-      btn.addEventListener('click', () => { btn.disabled = true; reconnect(); });
+      btn.addEventListener('click', () => { btn.disabled = true; message = ''; reconnect(); });
       setChildren(container, backLink(backHref, '戻る'), el('h1', { text: '保存の確認' }),
         el('p', { class: 'note', text: 'YouTube につながっていません。つなぐと、この画面に戻ります。次の画面で YouTube の項目にチェックを入れてください' }),
+        message ? el('p', { class: 'note error', role: 'alert', text: message }) : null,
         el('div', { class: 'actions' }, btn));
+    }
+
+    if (!status.connected) {
+      drawDisconnected();
       return;
     }
     if (pl.tracks.length === 0) {
