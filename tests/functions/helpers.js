@@ -6,21 +6,23 @@ export const daysAgo = (n) => new Date(NOW.getTime() - n * 86400000).toISOString
 
 export function makeDeps({ fetchMap = () => { throw new Error('no fetch'); }, env = {}, tables = {}, allowed = true, errors = {} } = {}) {
   const calls = [];
+  const reqs = []; // { url, method, body, headers }
   const db = fakeDb({
     users: { goodjwt: { id: 'u1', email: ' Me@Example.COM ' } },
     errors,
     tables: { allowed_emails: allowed ? [{ email: 'me@example.com' }] : [], ...tables },
   });
-  const fetch = async (url) => {
+  const fetch = async (url, init = {}) => {
     calls.push(String(url));
-    const r = await fetchMap(String(url));
+    reqs.push({ url: String(url), method: init.method ?? 'GET', body: init.body ? JSON.parse(init.body) : null, headers: init.headers });
+    const r = await fetchMap(String(url), init);
     return {
-      ok: r.status === undefined || r.status === 200,
+      ok: (r.status ?? 200) >= 200 && (r.status ?? 200) < 300,
       status: r.status ?? 200,
       json: async () => r.body,
     };
   };
-  return { deps: { fetch, db, env: (k) => env[k], now: () => NOW }, calls, db };
+  return { deps: { fetch, db, env: (k) => env[k], now: () => NOW }, calls, reqs, db };
 }
 
 export const post = (body, { jwt = 'goodjwt', origin = ORIGIN } = {}) =>
