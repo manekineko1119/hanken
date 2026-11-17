@@ -30,7 +30,8 @@ test('キャッシュの一覧は、すべて相対パス（./）で、サブパ
 
 test('キャッシュの一覧に、supabase の API・Edge Functions・認証・Google の URL が入っていない', () => {
   for (const u of PRECACHE_URLS) {
-    assert.doesNotMatch(u.replace('./vendor/supabase-js.mjs', ''), /supabase/i); // 自分で持っている supabase-js のファイルだけは除く
+    // 自分で持っている静的ファイル（vendor の supabase-js、_shared の純粋な関数）だけは除く
+    assert.doesNotMatch(u.replace('./vendor/supabase-js.mjs', '').replace('./supabase/functions/_shared/', ''), /supabase/i);
     assert.doesNotMatch(u, /\/functions\/v1\//);
     assert.doesNotMatch(u, /\/auth\/v1\//);
     assert.doesNotMatch(u, /\/rest\/v1\//);
@@ -138,4 +139,35 @@ test('privacy.html：動画の情報の保存期間（30日・60日）を設計�
   const h = readFileSync(new URL('privacy.html', root), 'utf8');
   assert.match(h, /60日/);
   assert.doesNotMatch(h, /最長30日までしか/);
+});
+
+test('main.js から静的 import をたどって届くファイルは、すべて一覧に入っている（src/ の外や vendor/ も含む）', () => {
+  const base = fileURLToPath(root);
+  const seen = new Set();
+  const queue = [join(base, 'src', 'main.js')];
+  const re = /\b(?:import|export)\b[^'";]*?\bfrom\s*['"]([^'"]+)['"]|\bimport\s*['"]([^'"]+)['"]/g;
+  while (queue.length) {
+    const file = queue.pop();
+    if (seen.has(file)) continue;
+    seen.add(file);
+    const src = readFileSync(file, 'utf8');
+    for (const m of src.matchAll(re)) {
+      const spec = m[1] ?? m[2];
+      if (!spec.startsWith('.')) continue;
+      queue.push(join(file, '..', spec));
+    }
+  }
+  assert.ok(seen.size > 10);
+  for (const f of seen) {
+    const rel = './' + relative(base, f).split(sep).join('/');
+    assert.ok(PRECACHE_URLS.includes(rel), `${rel} が一覧にない`);
+  }
+});
+
+test('privacy.html：上下の戻るリンクは、どちらも class="back" で「戻る」', () => {
+  const h = readFileSync(new URL('privacy.html', root), 'utf8');
+  const links = [...h.matchAll(/<a class="back" href="\.\/">([^<]*)<\/a>/g)];
+  assert.equal(links.length, 2);
+  for (const l of links) assert.equal(l[1], '戻る');
+  assert.doesNotMatch(h, /半券に戻る/);
 });
