@@ -3,6 +3,7 @@ import { listPlaylists } from '../data/playlists.js';
 import { runStart } from './prep-flow.js';
 import { sortPlaylists, filterPlaylists, youtubeMusicUrl, normalizePref } from '../core/playlist-list.js';
 import { formatDateJa } from '../core/lives.js';
+import { playlistHref } from '../router.js';
 
 const SORTS = [['newest', '新しい順'], ['oldest', '古い順'], ['live-date', 'ライブ順']];
 const KINDS = [['all', 'すべて'], ['prep', '予習'], ['setlist', 'セトリ']];
@@ -21,7 +22,7 @@ function liveText(live) {
   return `${formatDateJa(live.date)}${live.venue ? `　${live.venue}` : ''}`;
 }
 
-function row(p) {
+function row(p, { selectedId, onListRowClick }) {
   const url = youtubeMusicUrl(p.youtubePlaylistId);
   const info = [
     el('span', { class: 'row-title', text: p.title }),
@@ -33,7 +34,7 @@ function row(p) {
     return el('li', {}, el('div', { class: 'row' }, ...info, el('span', { class: 'row-sub', text: 'セトリの画面は準備中です' })));
   }
   return el('li', {},
-    el('a', { class: 'row', href: `#/playlist/${encodeURIComponent(p.id)}` }, ...info),
+    el('a', { class: 'row', href: playlistHref(p.id, { fromPrep: true }), 'aria-current': p.id === selectedId ? 'true' : null, onclick: onListRowClick }, ...info),
     p.status === 'saved'
       ? el('p', { class: 'row-status' },
         el('span', { class: 'status status-saved', text: '保存済み' }),
@@ -49,7 +50,21 @@ function select(label, options, value, onChange) {
 }
 
 export function renderPrep(container, ctx) {
-  loadView(container, ctx, listPlaylists, (items) => {
+  let updateRows;
+  let requestId = 0;
+
+  async function refresh() {
+    const current = ++requestId;
+    const alive = () => ctx.alive() && current === requestId;
+    if (!updateRows) {
+      await loadView(container, { alive }, listPlaylists, (items) => { updateRows = build(items); });
+      return;
+    }
+    const next = await listPlaylists().catch(() => null);
+    if (next && alive()) updateRows(next);
+  }
+
+  function build(items) {
     // プレイリストが1つもないときは条件の欄を出さないので、覚えていた条件も使わない。
     const pref = items.length ? loadPref() : normalizePref(null);
     const listBox = el('div', {});
@@ -57,13 +72,17 @@ export function renderPrep(container, ctx) {
       const shown = sortPlaylists(filterPlaylists(items, pref), pref.sort);
       setChildren(listBox,
         shown.length
-          ? el('ul', { class: 'list' }, ...shown.map(row))
+          ? el('ul', { class: 'list' }, ...shown.map((p) => row(p, ctx)))
           : el('p', { class: 'note', text: pref.kind === 'setlist' && !items.some((p) => p.kind === 'setlist') ? 'セトリはまだありません' : items.length ? '条件に合うプレイリストがありません' : 'まだありません' }));
     };
     const change = (patch) => { Object.assign(pref, patch); savePref(pref); drawList(); };
 
     const search = el('input', { type: 'text', maxlength: '100', class: 'filter-search', placeholder: '探す', 'aria-label': 'アーティスト名・タイトルで絞る', value: pref.text });
     search.addEventListener('input', () => change({ text: search.value }));
+    const filters = el('div', { class: 'filters', hidden: !items.length },
+      search,
+      select('並び順', SORTS, pref.sort, (v) => change({ sort: v })),
+      select('種類', KINDS, pref.kind, (v) => change({ kind: v })));
 
     const input = el('input', { type: 'text', maxlength: '100', placeholder: 'アーティスト名', 'aria-label': 'アーティスト名' });
     const msg = el('p', { class: 'note error', role: 'alert', hidden: true });
@@ -80,15 +99,18 @@ export function renderPrep(container, ctx) {
     drawList();
     setChildren(container,
       el('h1', { text: 'プレイリスト' }),
-      items.length
-        ? el('div', { class: 'filters' },
-          search,
-          select('並び順', SORTS, pref.sort, (v) => change({ sort: v })),
-          select('種類', KINDS, pref.kind, (v) => change({ kind: v })))
-        : null,
+      filters,
       listBox,
       el('h2', { text: 'アーティスト名から新しく作る' }),
       el('div', { class: 'field' }, el('label', { class: 'label', text: 'アーティスト名' }), input, go),
       msg);
-  });
+    return (next) => {
+      items = next;
+      filters.hidden = !items.length;
+      drawList();
+    };
+  }
+
+  refresh();
+  return refresh;
 }

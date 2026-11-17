@@ -2,7 +2,7 @@ import { el, appendChildren } from '../ui/dom.js';
 
 const TABS = [
   { href: '#/lives', label: 'ライブ', paths: ['/lives', '/live/new', '/live/:id', '/live/:id/edit'] },
-  { href: '#/prep', label: 'プレイリスト', paths: ['/prep'] },
+  { href: '#/prep', label: 'プレイリスト', paths: ['/prep', '/playlist/:id'] },
   { href: '#/settings', label: '設定', paths: ['/settings'] },
 ];
 

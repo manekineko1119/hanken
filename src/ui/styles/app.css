@@ -18,8 +18,8 @@
   --paper: #e9dfc8;     /* 半券の紙（生成り） */
   --paper-old: #dcd1b8; /* 行ったライブの紙 */
   --ink: #3f3b33;
-  --ink-soft: #6e675a;
-  --perf: rgba(63, 59, 51, 0.32); /* ミシン目 */
+  --ink-soft: #5e574b;
+  --perf: rgba(63, 59, 51, 0.32); /* ミシン目と紙の上のリンクの下線 */
   --rain: #5e7387;      /* 雨の青（紙の上） */
   --night: #151412;
   --font: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif;
@@ -244,21 +244,34 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offs
 .row-sub { font-size: 13px; line-height: 1.5; color: var(--muted); }
 .row:focus-visible { outline-offset: -2px; }
 
-/* ライブの一覧：1つのライブが1枚の券。
-   これから＝右にミシン目と半券が付いた券。行った＝半券を切り取ったあとの短い券（右の端がミシン目）。 */
+/* ライブの一覧：券の大きさはそろえ、これから／行ったを紙の色と切り欠きで示す。 */
 .tickets > li { border-bottom: 0; margin: 0 0 var(--s3); }
 .tickets .row {
-  position: relative;
   padding: var(--ticket-pad);
   border-radius: var(--radius-paper);
   background: var(--paper);
   color: var(--ink);
 }
 .tickets .row:focus-visible { outline-offset: 3px; }
-.tickets .row-date, .tickets .row-sub { color: var(--ink-soft); }
+.tickets .row-date, .tickets .row-sub {
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tickets .row-date { line-height: 1.6; block-size: 1.6em; }
+.tickets .row-sub { block-size: 1.5em; }
+.tickets .row-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  block-size: 2.9em;
+  overflow: hidden;
+}
 
 .tickets-upcoming { counter-reset: stub; }
 .tickets-upcoming .row {
+  position: relative;
   counter-increment: stub;
   padding-right: calc(var(--stub) + 18px);
   /* ミシン目の上下の切り欠き */
@@ -303,15 +316,13 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offs
 }
 
 .tickets-past .row {
-  margin-right: calc(var(--stub) - 4px);
-  padding-right: 20px;
   border-radius: var(--radius-paper) 0 0 var(--radius-paper);
   background: var(--paper-old);
   -webkit-mask: radial-gradient(circle 4px at 100% 50%, #0000 95%, #000) 0 0 / 100% 11px repeat-y;
   mask: radial-gradient(circle 4px at 100% 50%, #0000 95%, #000) 0 0 / 100% 11px repeat-y;
 }
 
-/* 紙の上に並べるもの（ライブの詳細の出演者・設定）。区切りはミシン目。 */
+/* 紙の上の出演者・曲の一覧。区切りはミシン目。 */
 .on-paper {
   padding: var(--s1) var(--s4);
   border-radius: var(--radius-paper);
@@ -321,9 +332,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offs
 @media (min-width: 600px) {
   .on-paper { padding: var(--s2) var(--s5); }
 }
-div.on-paper { padding-top: var(--s4); padding-bottom: var(--s4); }
-div.on-paper p { margin: 0 0 var(--s1); }
-div.on-paper p + button, div.on-paper p + .button { margin-top: var(--s3); }
 .on-paper > li { border-bottom: 2px dashed rgba(63, 59, 51, 0.25); }
 .on-paper > li:last-child { border-bottom: 0; }
 .on-paper button, .on-paper .button { background: transparent; color: var(--ink); border-color: rgba(63, 59, 51, 0.3); }
@@ -343,6 +351,7 @@ div.on-paper p + button, div.on-paper p + .button { margin-top: var(--s3); }
 .on-paper .status-saved { color: var(--rain); }
 
 .filters { display: flex; gap: 6px; margin: var(--s2) 0 var(--s3); }
+.filters[hidden] { display: none; }
 .filters .filter-search { flex: 1 1 0; min-width: 0; width: auto; }
 .filters .filter-select { flex: none; width: auto; max-width: 128px; padding: 10px 28px 10px 10px; background-position: right 10px center; }
 @media (max-width: 359px) {
@@ -358,6 +367,13 @@ div.on-paper p + button, div.on-paper p + .button { margin-top: var(--s3); }
 .artist-edit button { padding: 0 var(--s2); }
 .field > button { margin-top: var(--s2); }
 .actions { display: flex; flex-wrap: wrap; gap: var(--s3); margin-top: var(--s6); }
+.settings-view > h1 { margin-bottom: var(--s5); }
+.settings-section ~ .settings-section { margin-top: var(--s6); }
+.settings-section > h2 { margin: 0 0 var(--s2); }
+.settings-section > p { margin: 0; }
+.settings-section > p + p { margin-top: var(--s1); }
+.settings-actions, .settings-section > button + p { margin-top: var(--s3); }
+.settings-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
 
 /* 下のタブ：画面の端から端まで敷き、ボタンは中身と同じ 640px の列にそろえる */
 #tabbar {
@@ -433,10 +449,13 @@ div.on-paper p + button, div.on-paper p + .button { margin-top: var(--s3); }
   *, *::before, *::after { transition: none !important; }
 }
 
-/* ===== 一覧の画面（ライブ・プレイリスト）：600px 以上は 2 列 =====
+.master-detail.has-selection > .master-detail-list,
+.master-detail:not(.has-selection) > .master-detail-content { display: none; }
+
+/* ===== 一覧の画面（ライブ・プレイリスト）：幅があれば 2 列 =====
    中身の幅（--page）を、一覧のときだけ広げる。見出し・下のタブも同じ幅にそろう */
 @media (min-width: 600px) {
-  body:has(main .tickets, main .filters) { --page: var(--wide); }
+  body:has(main .master-detail:not(.has-selection) :is(.tickets, .filters:not([hidden]))) { --page: var(--wide); }
 
   /* 券を2列に並べる（幅が足りないときは1列のまま） */
   .tickets {
@@ -447,14 +466,14 @@ div.on-paper p + button, div.on-paper p + .button { margin-top: var(--s3); }
   .tickets > li { margin: 0; }
 
   /* プレイリストの一覧：行を2列に。探す・並び順は左の列の幅まで */
-  main .filters { max-width: var(--col); }
-  main:has(.filters) .list {
+  .master-detail-list .filters { max-width: var(--col); }
+  .master-detail-list:has(.filters:not([hidden])) .list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
     column-gap: var(--s6);
   }
   /* 入力の欄は、広い画面でも1列の幅まで */
-  main:has(.filters) .field { max-width: var(--col); }
+  .master-detail-list:has(.filters:not([hidden])) .field { max-width: var(--col); }
 }
 
 /* ===== PC（1024px 以上）：左に縦のメニュー。名前もメニューの上に置く ===== */
@@ -522,4 +541,39 @@ div.on-paper p + button, div.on-paper p + .button { margin-top: var(--s3); }
   h1 { margin-bottom: var(--s5); }
   .page-head { margin-bottom: var(--s5); }
   .page-head h1 { margin: 0; }
+
+  body:has(main .master-detail) { --page: var(--wide); }
+  .master-detail {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    align-items: start;
+    gap: var(--s6);
+  }
+  .master-detail.has-selection > .master-detail-list,
+  .master-detail:not(.has-selection) > .master-detail-content { display: block; }
+  .master-detail > section {
+    min-width: 0;
+  }
+  main:has(.master-detail, .settings-view) {
+    --gutter: var(--s6);
+    margin-inline: 0 auto;
+    padding-top: calc(var(--s5) + env(safe-area-inset-top));
+  }
+  .master-detail-list > h1, .settings-view > h1 { margin-top: 0; }
+  .master-detail-lives .page-head { margin: 0 0 var(--s5); }
+  .master-detail-lives .master-detail-list section + section { margin-top: var(--s6); }
+  .master-detail-lives .master-detail-list h2 { margin: 0 0 var(--s2); }
+  .master-detail-list .page-head, .master-detail-list .filters { flex-wrap: wrap; }
+  .master-detail-list .filters .filter-search { flex-basis: 3.75rem; }
+  .master-detail-list .filters .filter-select { padding-inline: var(--s2) 22px; background-position: right 6px center; }
+  .master-detail-list .tickets,
+  .master-detail-list:has(.filters:not([hidden])) .list { grid-template-columns: minmax(0, 1fr); }
+  .master-detail-list .row[aria-current="true"] .row-title {
+    text-decoration: underline;
+    text-decoration-color: currentColor;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+  }
+  .master-detail-list .tickets .row[aria-current="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
+  .master-detail-list .tickets .row:focus-visible { outline: 3px solid var(--rain); outline-offset: -3px; }
 }

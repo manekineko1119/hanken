@@ -58,8 +58,3 @@ export function cleanName(s) {
   const t = String(s ?? '').trim();
   return t && t.length <= NAME_MAX ? t : null;
 }
-
-// つなぎ直したあとに確認の画面へ戻るハッシュ。
-export function confirmReturnTo(id) {
-  return `#/playlist/${encodeURIComponent(id)}?confirm=1`;
-}

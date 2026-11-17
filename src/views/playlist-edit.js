@@ -2,7 +2,7 @@ import { el, setChildren, backLink, loadView, trashIcon } from '../ui/dom.js';
 import { getPlaylist, saveTracks } from '../data/playlists.js';
 import { renderPlaylistConfirm } from './playlist-confirm.js';
 import { getStatus, connect } from '../data/youtube.js';
-import { confirmReturnTo } from '../core/save-confirm.js';
+import { playlistHref } from '../router.js';
 import { needsReflect } from '../core/playlist-list.js';
 import { moveTrackTo, maxDropIndex } from '../core/reorder.js';
 import { attachDrag, cancelActiveDrag } from '../ui/drag-reorder.js';
@@ -36,12 +36,14 @@ function trackRow(t, i, tracks, on, editing, busy) {
 export function renderPlaylistEdit(container, ctx) {
   const id = ctx.params.id;
   if (ctx.query?.confirm === '1') { renderPlaylistConfirm(container, ctx); return; }
+  const fromPrep = ctx.query?.from === 'prep';
+  const confirmHref = playlistHref(id, { fromPrep, confirm: true });
   loadView(container, ctx, () => getPlaylist(id), (pl) => {
     if (!pl || pl.kind !== 'prep') {
       setChildren(container, backLink('#/prep', '戻る'), el('p', { class: 'note', text: 'このプレイリストは見つかりませんでした' }));
       return;
     }
-    const back = pl.live_id ? `#/live/${encodeURIComponent(pl.live_id)}` : '#/prep';
+    const back = !fromPrep && pl.live_id ? `#/live/${encodeURIComponent(pl.live_id)}` : '#/prep';
     let tracks = pl.tracks;
     let rest = pl.candidates ?? { popular: [], recent: [] };
     let message = '';
@@ -115,10 +117,10 @@ export function renderPlaylistEdit(container, ctx) {
         if (!ctx.alive()) return;
         if (connected) {
           busy = false;
-          location.hash = confirmReturnTo(id);
+          location.hash = confirmHref;
           return;
         }
-        await connect(confirmReturnTo(id));
+        await connect(confirmHref);
       } catch {
         if (!ctx.alive()) return;
         busy = false;

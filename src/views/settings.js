@@ -17,12 +17,15 @@ function showError(msg, text) {
 }
 
 export function renderSettings(container, ctx) {
-  loadView(container, ctx, getStatus, (status) => {
+  const view = el('div', { class: 'settings-view' });
+  setChildren(container, view);
+  loadView(view, ctx, getStatus, (status) => {
     const msg = el('p', { class: 'note error', role: 'alert', hidden: true });
     const notice = NOTICES[ctx.query?.yt];
     if (notice) showError(msg, notice);
 
-    const yt = el('div');
+    const yt = el('section', { class: 'settings-section' });
+    const ytHeading = el('h2', { text: 'YouTube' });
     if (status.connected) {
       const left = status.connectedAt ? daysLeft(status.connectedAt, new Date()) : 0;
       const off = el('button', { type: 'button', class: 'danger', text: '切断' });
@@ -41,13 +44,14 @@ export function renderSettings(container, ctx) {
         if (ctx.alive()) renderSettings(container, { ...ctx, query: {} });
       });
       setChildren(yt,
+        ytHeading,
         el('p', { text: `つながっています：${status.channelTitle || 'チャンネル名なし'}` }),
-        el('p', { class: 'meta', text: left > 0 ? `あと約${left}日で切れます` : '期限が切れています。つなぎ直してください' }),
-        left > 0 ? null : connectButton(msg, ctx),
-        off,
+        el('p', { class: 'note', text: left > 0 ? `あと約${left}日で切れます` : '期限が切れています。つなぎ直してください' }),
+        el('div', { class: 'settings-actions' }, left > 0 ? null : connectButton(msg, ctx), off),
       );
     } else {
-      setChildren(yt, el('p', { text: 'つながっていません' }), connectButton(msg, ctx));
+      setChildren(yt, ytHeading, el('p', { text: 'つながっていません' }),
+        el('div', { class: 'settings-actions' }, connectButton(msg, ctx)));
     }
 
     const out = el('button', { type: 'button', text: 'ログアウト' });
@@ -69,14 +73,14 @@ export function renderSettings(container, ctx) {
       showError(msg, 'ログアウトできませんでした（通信できません）');
     });
 
-    setChildren(container,
+    setChildren(view,
       el('h1', { text: '設定' }),
-      el('h2', { text: 'YouTube' }),
-      el('div', { class: 'on-paper' }, yt),
+      yt,
       msg,
-      el('h2', { text: 'アカウント' }),
-      out,
-      el('p', {}, el('a', { href: './privacy.html', text: 'プライバシーポリシー' })),
+      el('section', { class: 'settings-section' },
+        el('h2', { text: 'アカウント' }),
+        out,
+        el('p', {}, el('a', { href: './privacy.html', text: 'プライバシーポリシー' }))),
     );
   });
 }

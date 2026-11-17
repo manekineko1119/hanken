@@ -4,6 +4,7 @@ import { orderArtists, pickArtist, buildInitialTracks } from '../core/prep.js';
 import { playlistTitle } from '../core/naming.js';
 import { createPrepDraft } from '../data/playlists.js';
 import { setArtistItunesId } from '../data/lives.js';
+import { playlistHref } from '../router.js';
 
 export const CONTEXT_KEY = 'liveapp.prepContext';
 const MESSAGES = {
@@ -82,7 +83,7 @@ export async function runStart(c, ctx, { button, msg }) {
     return;
   }
   if (!ctx.alive()) return;
-  if (r.status === 'created') location.hash = `#/playlist/${encodeURIComponent(r.id)}`;
+  if (r.status === 'created') location.hash = playlistHref(r.id, { fromPrep: !c.liveId });
   else if (r.status === 'pick') location.hash = '#/artist-pick';
   else {
     msg.textContent = NOT_FOUND;
