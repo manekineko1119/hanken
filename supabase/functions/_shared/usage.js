@@ -20,9 +20,10 @@ export async function getSearchUsage(db, userId, now) {
 }
 
 // 検索の回数と単位を足し、足したあとの { user, global, units } を返す。searches に -1 を渡すと戻せる。
-export async function incrementUsage(db, userId, now, { searches = 0, units = 0 } = {}) {
+// kind が 'search' 以外（'save' など）のときは、一人あたりの回数と単位だけを足す（検索の枠は増やさない）。
+export async function incrementUsage(db, userId, now, { searches = 0, units = 0, kind = 'search' } = {}) {
   const { data, error } = await db.rpc('increment_usage', {
-    p_user_id: userId, p_day_jst: jstDay(now), p_day_pt: ptDay(now), p_kind: 'search',
+    p_user_id: userId, p_day_jst: jstDay(now), p_day_pt: ptDay(now), p_kind: kind,
     p_searches: searches, p_units: units,
   });
   const row = Array.isArray(data) ? data[0] : data;

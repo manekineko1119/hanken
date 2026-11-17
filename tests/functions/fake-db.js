@@ -41,7 +41,7 @@ export function fakeDb({ users = {}, tables = {}, errors = {} } = {}) {
         () => ({ user_id: a.p_user_id, day_jst: a.p_day_jst, kind: a.p_kind, count: 0 }));
       const g = find('api_usage', (r) => r.day_pt === a.p_day_pt, () => ({ day_pt: a.p_day_pt, units: 0, searches: 0 }));
       u.count = Math.max(0, u.count + a.p_searches);
-      g.searches = Math.max(0, g.searches + a.p_searches);
+      if (a.p_kind === 'search') g.searches = Math.max(0, g.searches + a.p_searches);
       g.units = Math.max(0, g.units + a.p_units);
       return { data: [{ user_count: u.count, global_searches: g.searches, global_units: g.units }], error: null };
     },
