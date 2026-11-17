@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickArtist, orderArtists, buildInitialTracks, replaceTrack, hasPopularity, moveTrack, addManualTrack } from '../src/core/prep.js';
+import { pickArtist, orderArtists, buildInitialTracks, replaceTrack, hasPopularity, moveTrack, addManualTrack, prepArtistName } from '../src/core/prep.js';
 
 const pop = (n) => Array.from({ length: n }, (_, i) => ({ title: `P${i + 1}`, source: 'lastfm' }));
 const rec = (n) => Array.from({ length: n }, (_, i) => ({ title: `R${i + 1}`, source: 'itunes' }));
@@ -147,4 +147,15 @@ test('addManualTrack: 最新の枠の前に足す。空・重複は無視', () =
   const empty = addManualTrack(ts, '   ', 'A');
   assert.equal(empty.tracks, ts);
   assert.equal(empty.duplicate, false);
+});
+
+test('prepArtistName：選んだ iTunes の候補の正式な名前を使う（入力した名前ではない）', () => {
+  assert.equal(prepArtistName('あわくもろく', { id: 1, name: '泡く、脆く。' }), '泡く、脆く。');
+  assert.equal(prepArtistName('ヨルシカ', { id: 2, name: ' ヨルシカ ' }), 'ヨルシカ');
+});
+
+test('prepArtistName：候補に名前がないときは、入力した名前', () => {
+  assert.equal(prepArtistName('あわくもろく', { id: 1 }), 'あわくもろく');
+  assert.equal(prepArtistName('あわくもろく', { id: 1, name: '  ' }), 'あわくもろく');
+  assert.equal(prepArtistName('あわくもろく', null), 'あわくもろく');
 });

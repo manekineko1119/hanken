@@ -1,6 +1,6 @@
 // 予習を作る流れ（画面から呼ぶ）。判断は core/prep.js、通信は Edge Function と data/playlists.js。
 import { getClient } from '../auth/auth.js';
-import { orderArtists, pickArtist, buildInitialTracks } from '../core/prep.js';
+import { orderArtists, pickArtist, buildInitialTracks, prepArtistName } from '../core/prep.js';
 import { playlistTitle } from '../core/naming.js';
 import { createPrepDraft } from '../data/playlists.js';
 import { setArtistItunesId } from '../data/lives.js';
@@ -43,7 +43,7 @@ export async function startPrep(c) {
   if (!candidates?.length) return { status: 'none' };
   const hit = pickArtist(c.name, candidates);
   if (!hit) return { status: 'pick' };
-  return { status: 'created', id: await createFor(c, hit.id) };
+  return { status: 'created', id: await createFor(c, hit) };
 }
 
 export async function orderedCandidates(name) {
@@ -51,13 +51,16 @@ export async function orderedCandidates(name) {
   return orderArtists(name, candidates ?? []);
 }
 
-export async function createFor(c, itunesArtistId) {
-  const cands = await call('track-candidates', { artistName: c.name, itunesArtistId });
-  const { tracks, rest } = buildInitialTracks({ popular: cands.popular ?? [], recent: cands.recent ?? [] }, c.name);
-  const title = playlistTitle({ kind: 'prep', artistName: c.name, date: c.date, venue: c.venue });
+// artist：選んだ iTunes の候補 { id, name }。名前は入力したものではなく、候補の正式な名前を使う。
+export async function createFor(c, artist) {
+  const itunesArtistId = artist.id;
+  const artistName = prepArtistName(c.name, artist);
+  const cands = await call('track-candidates', { artistName, itunesArtistId });
+  const { tracks, rest } = buildInitialTracks({ popular: cands.popular ?? [], recent: cands.recent ?? [] }, artistName);
+  const title = playlistTitle({ kind: 'prep', artistName, date: c.date, venue: c.venue });
   try {
     const id = await createPrepDraft({
-      liveId: c.liveId, liveArtistId: c.liveArtistId, artistName: c.name, itunesArtistId, tracks, rest, title,
+      liveId: c.liveId, liveArtistId: c.liveArtistId, artistName, itunesArtistId, tracks, rest, title,
     });
     clearContext();
     if (c.liveArtistId) await setArtistItunesId(c.liveArtistId, itunesArtistId).catch(() => {}); // 覚えられなくても作れている
