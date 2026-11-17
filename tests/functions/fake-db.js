@@ -14,11 +14,13 @@ export function fakeDb({ users = {}, tables = {}, errors = {} } = {}) {
   const upserts = [];
   const updates = [];
   const rpcCalls = [];
+  const lockCalls = []; // claim/release_playlist_save の呼び出し（順番の確認用）
   const matchAll = (filters) => (r) => filters.every(([c, v]) => r[c] === v);
   const db = {
     upserts,
     updates,
     rpcCalls,
+    lockCalls,
     tables,
     auth: {
       async getUser(jwt) {
@@ -29,6 +31,18 @@ export function fakeDb({ users = {}, tables = {}, errors = {} } = {}) {
     // increment_usage の偽物（SQL 関数と同じ足し方）
     async rpc(name, a) {
       if (errors.rpc) return { data: null, error: errors.rpc };
+      // claim/release_playlist_save の偽物（SQL 関数と同じ：持ち主の行で、鍵が空か期限切れのときだけ取る）
+      if (name === 'claim_playlist_save' || name === 'release_playlist_save') {
+        lockCalls.push({ name, ...a });
+        const row = (tables.playlists ??= []).find((r) => r.id === a.p_playlist_id && r.user_id === a.p_user_id);
+        if (name === 'release_playlist_save') {
+          if (row) row.save_locked_until = null;
+          return { data: null, error: null };
+        }
+        if (!row || (row.save_locked_until && Date.parse(row.save_locked_until) > Date.now())) return { data: false, error: null };
+        row.save_locked_until = new Date(Date.now() + a.p_seconds * 1000).toISOString();
+        return { data: true, error: null };
+      }
       if (name !== 'increment_usage') throw new Error('unexpected rpc ' + name);
       rpcCalls.push(a);
       const find = (t, pred, make) => {

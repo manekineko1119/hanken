@@ -39,6 +39,9 @@ export function saveErrorInfo(err) {
     const done = n > 0 ? `${n}曲まで入れたところで止まりました。` : '';
     return { message: `${done}YouTube で問題が起きました。もう一度「OK」を押すと、最初から入れ直します`, reconnect: false };
   }
+  if (code === 'BUSY') {
+    return { message: typeof err.message === 'string' && err.message ? err.message : '保存中です。少し待ってからもう一度押してください', reconnect: false };
+  }
   if (code === 'BAD_INPUT') {
     return { message: '入れられる曲がありません。先に曲を探してください', reconnect: false };
   }

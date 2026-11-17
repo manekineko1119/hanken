@@ -5,7 +5,8 @@ import { getAccessToken } from '../_shared/youtube-auth.js';
 
 const TIMEOUT_MS = 8000;
 const API = 'https://www.googleapis.com/youtube/v3';
-const COST = { insert: 50, delete: 50, list: 1, create: 50 };
+const COST = { insert: 50, delete: 50, list: 1, create: 50, update: 50 };
+const LOCK_SECONDS = 120; // 保存の鍵の長さ。途中で落ちても、これを過ぎれば自然に空く
 const TITLE_MAX = 150; // YouTube のプレイリスト名の上限
 
 function coded(code, message, extra = {}) {
@@ -31,6 +32,7 @@ export async function handle(req, deps) {
   let userCounted = false; // 本人の回数を足したか
   let reserved = 0; // api_usage に見積もりとして足した単位
   let spent = 0; // 実際に YouTube を呼んで使った単位
+  let locked = false; // このプレイリストの保存の鍵を持っているか
   let inserted = 0;
   let skipped = 0;
 
@@ -81,7 +83,17 @@ export async function handle(req, deps) {
     const pl = await deps.db.from('playlists').select('*').eq('id', playlistId).maybeSingle();
     if (pl.error) throw coded('UPSTREAM', 'プレイリストを確かめられませんでした');
     if (!pl.data || pl.data.user_id !== user.id) return fail('BAD_INPUT', 'プレイリストが見つかりません', 404);
-    const playlist = pl.data;
+
+    // 同じプレイリストへの保存は1つずつ（同時に押されると、YouTube にプレイリストが2つできてしまう）。
+    const claim = await deps.db.rpc('claim_playlist_save', { p_playlist_id: playlistId, p_user_id: user.id, p_seconds: LOCK_SECONDS });
+    if (claim.error) throw coded('UPSTREAM', 'プレイリストを確かめられませんでした');
+    if (claim.data !== true) return fail('BUSY', '保存中です。少し待ってからもう一度押してください', 409);
+    locked = true;
+
+    // 鍵を取る前に終わった保存の結果（youtube_playlist_id）を取りこぼさないよう、鍵を取ってから読み直す。
+    const fresh = await deps.db.from('playlists').select('*').eq('id', playlistId).maybeSingle();
+    if (fresh.error || !fresh.data) throw coded('UPSTREAM', 'プレイリストを確かめられませんでした');
+    const playlist = fresh.data;
 
     const tr = await deps.db.from('playlist_tracks').select('*').eq('playlist_id', playlistId).order('position');
     if (tr.error) throw coded('UPSTREAM', '曲を読めませんでした');
@@ -119,12 +131,19 @@ export async function handle(req, deps) {
     }
 
     // YouTube の枠：本当の項目数で見積もりを先に足して、9,500 を超えていたら戻す（消す前に止める）。
-    const estimate = estimateSaveUnits({ existingItems: ids.length, count: playable.length, isNew: !ytId });
+    // 作り直しで名前が変わっていたら、YouTube 側の名前も更新する（playlists.update：50単位）。
+    const rename = !!ytId && title !== playlist.title;
+    const estimate = estimateSaveUnits({ existingItems: ids.length, count: playable.length, isNew: !ytId }) + (rename ? COST.update : 0);
     const u = await incrementUsage(deps.db, user.id, now, { kind: 'save', units: estimate });
     reserved = estimate;
     if (!canSpend(u.units - estimate, estimate)) {
       await refundAll();
       return fail('QUOTA', '今日の YouTube の枠がいっぱいです。日本時間の17時ごろ（冬は17時、夏は16時）に戻ります', 429);
+    }
+
+    if (rename) {
+      const res = await yt('PUT', 'playlists', { part: 'snippet' }, token, { id: ytId, snippet: { title } }, COST.update);
+      if (!res.ok) throw await failed(res, '名前を変え');
     }
 
     for (const id of ids) {
@@ -153,7 +172,7 @@ export async function handle(req, deps) {
 
     await settle();
     const done = await deps.db.from('playlists').update({
-      status: 'saved', youtube_playlist_id: ytId, saved_at: now.toISOString(),
+      status: 'saved', title, youtube_playlist_id: ytId, saved_at: now.toISOString(),
     }).eq('id', playlistId);
     if (done.error) throw coded('UPSTREAM', '保存した結果を記録できませんでした');
     return json({
@@ -168,5 +187,10 @@ export async function handle(req, deps) {
     if (e?.code === 'QUOTA') return send('QUOTA', 429);
     if (e?.code === 'UPSTREAM') return send('UPSTREAM', 502);
     throw e;
+  } finally {
+    // 鍵は必ず外す（外せなくても、期限が来れば空く）。
+    if (locked) {
+      try { await deps.db.rpc('release_playlist_save', { p_playlist_id: playlistId, p_user_id: user.id }); } catch { /* 期限で空く */ }
+    }
   }
 }

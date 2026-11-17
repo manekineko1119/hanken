@@ -86,3 +86,10 @@ test('confirmReturnTo: 確認の画面へ戻るハッシュ', () => {
   assert.equal(confirmReturnTo('abc-123'), '#/playlist/abc-123?confirm=1');
   assert.equal(confirmReturnTo('a b'), '#/playlist/a%20b?confirm=1');
 });
+
+test('saveErrorInfo: BUSY（保存中）はサーバーの文言を出し、つなぎ直さない', () => {
+  const r = saveErrorInfo({ code: 'BUSY', message: '保存中です。少し待ってからもう一度押してください' });
+  assert.equal(r.message, '保存中です。少し待ってからもう一度押してください');
+  assert.equal(r.reconnect, false);
+  assert.equal(saveErrorInfo({ code: 'BUSY' }).message, '保存中です。少し待ってからもう一度押してください');
+});
