@@ -1,21 +1,25 @@
 import { el, backLink, loadView, setChildren } from '../ui/dom.js';
 import { getLive, saveLive } from '../data/lives.js';
-import { validateLive } from '../core/live-form.js';
+import { validateLive, newArtist, deletableIds } from '../core/live-form.js';
 
 const SAVE_ERROR = '保存できませんでした。通信を確かめて、もう一度押してください';
 
 // フォームの状態。artists の original は読み込んだときの名前（変えたら itunes_artist_id を外す）。
 function initialState(live) {
-  return {
+  const state = {
     id: live?.id ?? null,
+    // 開いたときに読んだ出演者の id（新しいライブは null：作ったあとの再試行では、今までどおり差分で消す）
+    loadedIds: live ? (live.artists ?? []).map((a) => a.id) : null,
     date: live?.date ?? '',
     venue: live?.venue ?? '',
     title: live?.title ?? '',
     memo: live?.memo ?? '',
-    artists: live?.artists?.length
-      ? live.artists.map((a) => ({ id: a.id, name: a.name, original: a.name }))
-      : [{ id: null, name: '', original: null }],
+    artists: [],
   };
+  state.artists = live?.artists?.length
+    ? live.artists.map((a) => ({ id: a.id, name: a.name, original: a.name }))
+    : [newArtist(state)];
+  return state;
 }
 
 function toPayload(state) {
@@ -23,7 +27,7 @@ function toPayload(state) {
   const artists = state.artists.map((a) => {
     const out = { name: a.name };
     if (a.id) out.id = a.id;
-    if (a.id && a.name.trim() !== a.original.trim()) out.itunes_artist_id = null;
+    if (a.id && a.original != null && a.name.trim() !== a.original.trim()) out.itunes_artist_id = null;
     return out;
   });
   return { live: { id: state.id, date: state.date, venue: orNull(state.venue), title: orNull(state.title), memo: orNull(state.memo) }, artists };
@@ -93,7 +97,7 @@ function buildForm(container, state, isNew, alive) {
       type: 'button',
       text: '出演者を足す',
       onclick: () => {
-        state.artists.push({ id: null, name: '', original: null });
+        state.artists.push(newArtist(state));
         draw();
       },
     });
@@ -133,7 +137,7 @@ function buildForm(container, state, isNew, alive) {
     draw();
     const { live, artists } = toPayload(state);
     try {
-      const id = await saveLive(live, artists);
+      const id = await saveLive(live, artists, deletableIds(state));
       if (alive()) location.hash = `#/live/${encodeURIComponent(id)}`;
       return;
     } catch (err) {

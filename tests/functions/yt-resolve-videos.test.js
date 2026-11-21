@@ -109,14 +109,14 @@ test('見つからなかった曲は videoId null で、次回は検索しない
   assert.equal(searchCalls(calls).length, 1);
 });
 
-test('一人30回を超えると QUOTA', async () => {
+test('一人30回を超えると、200 のまま quota（QUOTA）を返す（ブラウザに赤いエラーを出さない）', async () => {
   const { deps, calls } = makeDeps({
     env, tables: base([trk('t1', '曲1')], { user_daily_usage: [{ user_id: 'u1', day_jst: '2026-11-17', kind: 'search', count: 30 }] }),
     fetchMap: router(),
   });
   const res = await handle(post({ playlistId: PL }), deps);
-  assert.equal(res.status, 429);
-  assert.equal((await res.json()).error.code, 'QUOTA');
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).quota.code, 'QUOTA');
   assert.equal(calls.length, 0);
 });
 
@@ -126,8 +126,8 @@ test('全員で90回を超えると QUOTA（太平洋時間の日付で数える
     fetchMap: router(),
   });
   const res = await handle(post({ playlistId: PL }), deps);
-  assert.equal(res.status, 429);
-  assert.equal((await res.json()).error.code, 'QUOTA');
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).quota.code, 'QUOTA');
   assert.equal(calls.length, 0);
 });
 
@@ -223,9 +223,9 @@ test('途中で枠が切れても、ここまでの結果は保存され、QUOTA
     fetchMap: router(),
   });
   const res = await handle(post({ playlistId: PL }), deps);
-  assert.equal(res.status, 429);
+  assert.equal(res.status, 200);
   const j = await res.json();
-  assert.equal(j.error.code, 'QUOTA');
+  assert.equal(j.quota.code, 'QUOTA');
   assert.equal(j.searchesLeft, 0);
   assert.deepEqual(j.tracks, [
     { id: 't1', videoId: 's1', videoTitle: '曲1' },
@@ -244,7 +244,7 @@ test('枠の確認は、先に足してから行う（足したあとの値で�
     env, tables: base([trk('t1', '曲1')], { api_usage: [{ day_pt: '2026-11-16', units: 5, searches: 90 }] }),
     fetchMap: router(),
   });
-  assert.equal((await handle(post({ playlistId: PL }), deps)).status, 429);
+  assert.equal((await handle(post({ playlistId: PL }), deps)).status, 200);
   assert.deepEqual(db.rpcCalls.map((c) => c.p_searches), [1, -1]);
   assert.equal(db.tables.api_usage[0].searches, 90);
   assert.equal(db.tables.api_usage[0].units, 5);

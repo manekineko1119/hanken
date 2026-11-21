@@ -168,11 +168,12 @@ export async function handle(req, deps) {
       searchesLeft: Math.max(0, LIMITS.search - userCount),
     };
     // 枠を超えたときも、ここまでの結果を返す（クライアントが「枠切れ」と「見つからない」を見分けられるように）。
+    // 上限は決まりどおりの動きなので 200 で返す（429 にすると、ブラウザが毎回赤いエラーを出す）。
     if (quotaHit) {
       const message = quotaHit === 'user'
         ? '今日はこれ以上曲を探せません（1日30回まで）。ここまでの結果は保存しました'
         : '今日はこれ以上曲を探せません。ここまでの結果は保存しました';
-      return json({ error: { code: 'QUOTA', message }, ...result }, 429, origin, deps.env);
+      return json({ quota: { code: 'QUOTA', message }, ...result }, 200, origin, deps.env);
     }
     return json(result, 200, origin, deps.env);
   } catch (e) {

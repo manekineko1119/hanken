@@ -156,21 +156,23 @@ test('start: 設定が足りない・保存に失敗したら 502 UPSTREAM', asy
 });
 
 // ---- yt-connect-callback ----
-test('callback: 成功で暗号化して保存し、state を消して returnTo へ 302', async () => {
+test('callback: 成功で暗号化して保留に置き、state を消して確定の画面へ 302（本保存はしない）', async () => {
   const db = makeDb({ oauth_states: [stateRow()] });
   const { deps, calls } = mk(db, googleOk);
   const res = await callback(cbReq('code=abc&state=st1'), deps);
   assert.equal(res.status, 302);
-  assert.equal(loc(res), 'http://localhost:8080/#/playlist/p1?confirm=1');
   assert.equal(db.t.oauth_states.length, 0);
-  const row = db.t.youtube_connections[0];
+  assert.equal(db.t.youtube_connections, undefined);
+  const row = db.t.youtube_pending[0];
+  assert.equal(loc(res), `http://localhost:8080/#/settings?yt=finish&p=${encodeURIComponent(row.id)}`);
   assert.equal(row.user_id, 'u1');
   assert.equal(row.channel_title, 'My Channel');
+  assert.equal(row.return_to, '#/playlist/p1?confirm=1');
   assert.ok(!JSON.stringify(row).includes('rt1') && !JSON.stringify(row).includes('at1'));
   assert.equal(await decrypt(row.refresh_token_enc, KEY), 'rt1');
   assert.equal(await decrypt(row.access_token_enc, KEY), 'at1');
   assert.equal(row.access_expires_at, iso(3600 * 1000));
-  assert.equal(row.connected_at, NOW.toISOString());
+  assert.equal(row.expires_at, iso(10 * 60000));
   const tok = calls[0].body;
   assert.equal(tok.get('grant_type'), 'authorization_code');
   assert.equal(tok.get('code'), 'abc');
@@ -228,12 +230,13 @@ test('callback: トークン交換の失敗・refresh_token なし・チャン�
     [{ ...googleOk, [TOKEN_URL]: { status: 400, body: { error: 'invalid_grant' } } }, {}],
     [{ ...googleOk, [TOKEN_URL]: { body: { ...goodToken, refresh_token: undefined } } }, {}],
     [{ ...googleOk, [CHANNELS_URL]: { status: 403, body: {} } }, {}],
-    [googleOk, { youtube_connections: { message: 'boom' } }],
+    [googleOk, { youtube_pending: { message: 'boom' } }],
   ];
   for (const [map, errors] of cases) {
     const db = makeDb({ oauth_states: [stateRow()] }, errors);
     const res = await callback(cbReq('code=abc&state=st1'), mk(db, map).deps);
     assert.equal(loc(res), ERR);
+    assert.ok(!db.t.youtube_pending?.length);
     assert.ok(!db.t.youtube_connections?.length);
   }
 });
@@ -242,14 +245,13 @@ test('callback: チャンネルがなくても保存できる（名前は null�
   const db = makeDb({ oauth_states: [stateRow()] });
   const { deps } = mk(db, { ...googleOk, [CHANNELS_URL]: { body: { items: [] } } });
   await callback(cbReq('code=abc&state=st1'), deps);
-  assert.equal(db.t.youtube_connections[0].channel_title, null);
+  assert.equal(db.t.youtube_pending[0].channel_title, null);
 });
 
-test('callback: 保存済みの return_to が不正なら、戻り先は使わず settings へ', async () => {
+test('callback: 保存済みの return_to が不正でも、戻るのはいつも確定の画面（戻り先は finish が確かめる）', async () => {
   const db = makeDb({ oauth_states: [stateRow({ return_to: 'https://evil.example/' })] });
   const res = await callback(cbReq('code=abc&state=st1'), mk(db, googleOk).deps);
-  assert.equal(loc(res), 'http://localhost:8080/#/settings');
-  assert.equal(db.t.youtube_connections.length, 1);
+  assert.match(loc(res), /^http:\/\/localhost:8080\/#\/settings\?yt=finish&p=/);
 });
 
 test('callback: GET 以外は 405', async () => {
@@ -374,15 +376,13 @@ test('callback: db が throw しても 302 で yt=error', async () => {
   assert.equal(loc(res), ERR);
 });
 
-test('callback: つなぎ直し（既存の行）は上書きされる', async () => {
+test('callback: つなぎ直しでも、確定するまで今のつながり（既存の行）は変えない', async () => {
   const old = await connRow({ channel_title: 'Old', connected_at: iso(-86400000) });
   const db = makeDb({ oauth_states: [stateRow()], youtube_connections: [old] });
   await callback(cbReq('code=abc&state=st1'), mk(db, googleOk).deps);
   assert.equal(db.t.youtube_connections.length, 1);
-  const row = db.t.youtube_connections[0];
-  assert.equal(row.channel_title, 'My Channel');
-  assert.equal(row.connected_at, NOW.toISOString());
-  assert.equal(await decrypt(row.refresh_token_enc, KEY), 'rt1');
+  assert.equal(db.t.youtube_connections[0].channel_title, 'Old');
+  assert.equal(db.t.youtube_pending.length, 1);
 });
 
 // ---- fix round 2 ----
@@ -404,7 +404,7 @@ test('callback: APP_ORIGIN がサブパス付き（GitHub Pages）なら、そ�
     const env = deps.env;
     deps.env = (k) => (k === 'APP_ORIGIN' ? app : env(k));
     const res = await callback(cbReq('code=abc&state=st1'), deps);
-    assert.equal(loc(res), 'https://user.github.io/hanken/#/playlist/p1?confirm=1');
+    assert.match(loc(res), /^https:\/\/user\.github\.io\/hanken\/#\/settings\?yt=finish&p=/);
     const db2 = makeDb();
     const { deps: d2 } = mk(db2, googleOk);
     d2.env = (k) => (k === 'APP_ORIGIN' ? app : env(k));

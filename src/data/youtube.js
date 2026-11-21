@@ -29,6 +29,17 @@ export async function connect(returnTo) {
   location.assign(data.url);
 }
 
+// Google から戻ったあと、保留の鍵を自分のつながりとして確定する。{ returnTo, channelTitle }。
+// 失敗したら code（WRONG_USER・EXPIRED など）を持つ Error を投げる。
+export async function finishConnect(pendingId) {
+  let res;
+  try { res = await getClient().functions.invoke('yt-connect-finish', { body: { pendingId } }); } catch { res = { error: {} }; }
+  if (!res.error) return res.data;
+  let code;
+  try { code = (await res.error.context?.json?.())?.error?.code; } catch { code = undefined; }
+  throw Object.assign(new Error(FAILED), { code });
+}
+
 export async function disconnect() {
   await invoke('yt-disconnect', {});
 }

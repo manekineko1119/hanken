@@ -4,6 +4,9 @@ export const ORIGIN = 'http://localhost:8080';
 export const NOW = new Date('2026-11-17T00:00:00Z');
 export const daysAgo = (n) => new Date(NOW.getTime() - n * 86400000).toISOString();
 
+// JSON でなければ（フォームの送信など）そのままの文字列で持つ
+const parseBody = (b) => { try { return JSON.parse(b); } catch { return String(b); } };
+
 export function makeDeps({ fetchMap = () => { throw new Error('no fetch'); }, env = {}, tables = {}, allowed = true, errors = {} } = {}) {
   const calls = [];
   const reqs = []; // { url, method, body, headers }
@@ -14,7 +17,7 @@ export function makeDeps({ fetchMap = () => { throw new Error('no fetch'); }, en
   });
   const fetch = async (url, init = {}) => {
     calls.push(String(url));
-    reqs.push({ url: String(url), method: init.method ?? 'GET', body: init.body ? JSON.parse(init.body) : null, headers: init.headers });
+    reqs.push({ url: String(url), method: init.method ?? 'GET', body: init.body ? parseBody(init.body) : null, headers: init.headers });
     const r = await fetchMap(String(url), init);
     return {
       ok: (r.status ?? 200) >= 200 && (r.status ?? 200) < 300,

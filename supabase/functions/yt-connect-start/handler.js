@@ -1,18 +1,10 @@
 import { prelude, readJson, json, errorJson } from '../_shared/http.js';
 import { safeReturnTo } from '../_shared/return-to.js';
 import { YT_SCOPE } from '../_shared/youtube-auth.js';
+import { randomB64url, bytesToB64url } from '../_shared/random.js';
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 
-function randomB64url(bytes) {
-  return bytesToB64url(globalThis.crypto.getRandomValues(new Uint8Array(bytes)));
-}
-
-function bytesToB64url(bytes) {
-  let bin = '';
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
 
 async function challengeOf(verifier) {
   const digest = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));

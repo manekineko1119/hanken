@@ -11,3 +11,18 @@ test('daysLeft：8日後は0（負にならない）', () => assert.equal(daysLe
 test('daysLeft：ちょうど7日後は0', () => assert.equal(daysLeft(base, after(7)), 0));
 test('daysLeft：半日過ぎたら切り上げて残りを数える', () => assert.equal(daysLeft(base, after(2.5)), 5));
 test('daysLeft：日時が読めないときは0', () => assert.equal(daysLeft('x', after(1)), 0));
+
+test('pendingIdOf：yt=finish と p があれば p を返す。なければ null', async () => {
+  const { pendingIdOf } = await import('../src/core/youtube.js');
+  assert.equal(pendingIdOf({ yt: 'finish', p: 'abc' }), 'abc');
+  assert.equal(pendingIdOf({ yt: 'finish' }), null);
+  assert.equal(pendingIdOf({ yt: 'error', p: 'abc' }), null);
+  assert.equal(pendingIdOf(undefined), null);
+});
+
+test('finishErrorText：ほかのアカウント・時間切れ・そのほか', async () => {
+  const { finishErrorText } = await import('../src/core/youtube.js');
+  assert.match(finishErrorText('WRONG_USER'), /ほかのアカウント/);
+  assert.match(finishErrorText('EXPIRED'), /時間が切れ/);
+  assert.match(finishErrorText(undefined), /つなげませんでした/);
+});

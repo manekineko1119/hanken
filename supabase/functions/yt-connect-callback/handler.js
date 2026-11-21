@@ -1,8 +1,12 @@
-// Google からの戻り。JWT なし（verify_jwt = false）。本人かどうかは state で確かめる。
+// Google からの戻り。JWT なし（verify_jwt = false）。始めた人は state でわかる。
+// 鍵はここでは本保存せず、保留（youtube_pending）に置く。ログイン中のアプリが yt-connect-finish で
+// 同じ人だと確かめてから保存する（許可の URL を別の人に踏ませる手を防ぐ）。
 // 結果は、いつも 302 でアプリに戻す。
 import { encrypt } from '../_shared/crypto.js';
-import { safeReturnTo } from '../_shared/return-to.js';
+import { randomB64url } from '../_shared/random.js';
 import { GOOGLE_TOKEN_URL, YT_SCOPE, postForm } from '../_shared/youtube-auth.js';
+
+const PENDING_TTL_MS = 10 * 60 * 1000;
 
 const CHANNELS_URL = 'https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true';
 
@@ -36,6 +40,7 @@ async function run(req, deps) {
   if (!(Date.parse(st.expires_at) > deps.now().getTime())) return fail();
   if (q.get('error') || !q.get('code')) return fail();
 
+  let pendingId;
   try {
     const keyB64 = deps.env('YT_TOKEN_KEY');
     const tokRes = await postForm(deps, GOOGLE_TOKEN_URL, {
@@ -63,23 +68,22 @@ async function run(req, deps) {
     const channelTitle = ch?.items?.[0]?.snippet?.title ?? null;
 
     const now = deps.now();
-    const { error } = await deps.db.from('youtube_connections').upsert(
-      {
-        user_id: st.user_id,
-        channel_title: channelTitle,
-        refresh_token_enc: await encrypt(tok.refresh_token, keyB64),
-        access_token_enc: await encrypt(tok.access_token, keyB64),
-        access_expires_at: new Date(now.getTime() + (Number(tok.expires_in) || 3600) * 1000).toISOString(),
-        connected_at: now.toISOString(),
-      },
-      { onConflict: 'user_id' },
-    );
+    pendingId = randomB64url(32);
+    const { error } = await deps.db.from('youtube_pending').insert({
+      id: pendingId,
+      user_id: st.user_id,
+      channel_title: channelTitle,
+      refresh_token_enc: await encrypt(tok.refresh_token, keyB64),
+      access_token_enc: await encrypt(tok.access_token, keyB64),
+      access_expires_at: new Date(now.getTime() + (Number(tok.expires_in) || 3600) * 1000).toISOString(),
+      return_to: st.return_to,
+      expires_at: new Date(now.getTime() + PENDING_TTL_MS).toISOString(),
+    });
     if (error) return fail();
   } catch {
     return fail();
   }
 
-  // 保存時に確かめてあるが、使う直前にもう一度確かめる。
-  const returnTo = safeReturnTo(st.return_to);
-  return returnTo ? redirect(returnTo) : redirect('#/settings');
+  // 戻り先は finish が返す（保留に入れてある）。
+  return redirect(`#/settings?yt=finish&p=${encodeURIComponent(pendingId)}`);
 }

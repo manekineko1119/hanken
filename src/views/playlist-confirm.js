@@ -81,7 +81,7 @@ export function renderPlaylistConfirm(container, ctx) {
         el('label', { class: 'meta', text: 'プレイリストの名前' }),
         nameInput,
         !cleanName(typed) ? el('p', { class: 'note error', text: '名前は1〜150文字で入れてください' }) : null,
-        el('p', { class: 'note', text: '非公開で保存します（自分だけが見られます）' }),
+        el('p', { class: 'note', text: '非公開で保存します（自分だけが見られます）。YouTube で公開に変えたプレイリストには保存しません' }),
         pl.status === 'saved' ? el('p', { class: 'note', text: '前に保存したプレイリストの中身を、この曲で入れ替えます' }) : null,
         el('h2', { text: `入れる曲（${found.length}曲）` }),
         found.length

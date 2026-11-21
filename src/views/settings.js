@@ -1,7 +1,7 @@
 import { el, setChildren, loadView } from '../ui/dom.js';
 import { signOut } from '../auth/auth.js';
-import { getStatus, connect, disconnect } from '../data/youtube.js';
-import { daysLeft } from '../core/youtube.js';
+import { getStatus, connect, disconnect, finishConnect } from '../data/youtube.js';
+import { daysLeft, pendingIdOf, finishErrorText } from '../core/youtube.js';
 
 export { daysLeft };
 
@@ -19,9 +19,24 @@ function showError(msg, text) {
 export function renderSettings(container, ctx) {
   const view = el('div', { class: 'settings-view' });
   setChildren(container, view);
+  // Google から戻ったところ：ログイン中のこの人のつながりとして確定してから、元の画面へ戻る。
+  const pendingId = pendingIdOf(ctx.query);
+  if (pendingId) {
+    setChildren(view, el('h1', { text: '設定' }), el('p', { class: 'note', role: 'status', text: 'YouTube とつないでいます…' }));
+    (async () => {
+      let done = null;
+      let code;
+      try { done = await finishConnect(pendingId); } catch (e) { code = e?.code; }
+      if (!ctx.alive()) return;
+      // 戻る・進むで保留の id を使い直さないよう、履歴を置き換える。
+      if (done) { location.replace(done.returnTo || '#/settings'); return; }
+      renderSettings(container, { ...ctx, query: {}, finishError: finishErrorText(code) });
+    })();
+    return;
+  }
   loadView(view, ctx, getStatus, (status) => {
     const msg = el('p', { class: 'note error', role: 'alert', hidden: true });
-    const notice = NOTICES[ctx.query?.yt];
+    const notice = ctx.finishError ?? NOTICES[ctx.query?.yt];
     if (notice) showError(msg, notice);
 
     const yt = el('section', { class: 'settings-section' });

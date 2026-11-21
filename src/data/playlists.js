@@ -1,5 +1,6 @@
 // プレイリストの保存・読み込み（Supabase）。薄く保つ。判断は src/core/ に置く。
 import { getClient } from '../auth/auth.js';
+import { unwrapResolve } from '../core/save-confirm.js';
 
 const trackRow = (playlistId, t, i) => ({
   playlist_id: playlistId, position: i, title: t.title, artist_name: t.artistName,
@@ -15,7 +16,7 @@ function check({ error }) {
 export async function createPrepDraft({ liveId, liveArtistId, artistName, itunesArtistId, tracks, rest, title }) {
   const db = getClient();
   const { data, error } = await db.from('playlists').insert({
-    kind: 'prep', status: 'draft', live_id: liveId ?? null, live_artist_id: liveArtistId ?? null,
+    kind: 'prep', live_id: liveId ?? null, live_artist_id: liveArtistId ?? null,
     artist_name: artistName, itunes_artist_id: itunesArtistId ?? null, title, candidates: rest,
   }).select('id').single();
   if (error) throw error;
@@ -100,8 +101,8 @@ async function callFunction(name, body) {
 
 // 曲ごとに YouTube Music の曲を探す。{ tracks: [{ id, videoId, videoTitle }], searchesLeft }。
 // 枠切れ（QUOTA）は、ここまでの結果を持つ Error（e.tracks）で返る。
-export function resolveVideos(playlistId) {
-  return callFunction('yt-resolve-videos', { playlistId });
+export async function resolveVideos(playlistId) {
+  return unwrapResolve(await callFunction('yt-resolve-videos', { playlistId }));
 }
 
 // YouTube に非公開で保存する。{ youtubePlaylistId, url, inserted, skipped }。

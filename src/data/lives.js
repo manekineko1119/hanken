@@ -30,7 +30,8 @@ export async function getLive(id) {
 
 // upsert は使わない（設計 5.2）。出演者は差分で保存する（行を消して入れ直すと、プレイリストが cascade で消える）。
 // 新規 live の作成後に失敗したら、err.liveId に id を付ける（画面は update として再試行できる）。
-export async function saveLive(live, artists) {
+// loadedIds：編集の画面を開いたときの出演者の id。消すのはこの中だけ（core/live-form.js の planArtistChanges）。
+export async function saveLive(live, artists, loadedIds = null) {
   const db = getClient();
   const fields = { date: live.date, venue: live.venue ?? null, title: live.title ?? null, memo: live.memo ?? null };
   let id = live.id;
@@ -44,7 +45,7 @@ export async function saveLive(live, artists) {
   try {
     const { data: existing, error } = await db.from('live_artists').select('id, name, position').eq('live_id', id);
     if (error) throw error;
-    const plan = planArtistChanges(existing, artists);
+    const plan = planArtistChanges(existing, artists, loadedIds);
     if (plan.deletes.length) check(await db.from('live_artists').delete().in('id', plan.deletes));
     for (const { id: artistId, ...rest } of plan.updates) {
       check(await db.from('live_artists').update(rest).eq('id', artistId));

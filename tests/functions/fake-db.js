@@ -3,7 +3,9 @@
 //   from(t).select(cols).eq(col, v)...[.order(col)] を await（配列）／.maybeSingle()
 //   from(t).update(patch).eq(col, v)... を await
 //   from(t).upsert(row) …… 主キー（PK_COLS）が同じ行は置き換える
+//   from(t).insert(row) を await ／ from(t).delete().eq(col, v)... を await
 const PK_COLS = {
+  youtube_connections: ['user_id'],
   track_cache: ['artist_key'],
   video_cache: ['artist_key', 'title_key'],
   api_usage: ['day_pt'],
@@ -63,8 +65,14 @@ export function fakeDb({ users = {}, tables = {}, errors = {} } = {}) {
       const filters = [];
       let orderCol = null;
       let patch = null;
+      let removing = false;
       const run = () => {
         if (errors[table]) return { data: null, error: errors[table] };
+        if (removing) {
+          const all = (tables[table] ??= []);
+          tables[table] = all.filter((r) => !matchAll(filters)(r));
+          return { data: null, error: null };
+        }
         let rows = (tables[table] ??= []).filter(matchAll(filters));
         if (patch) {
           rows.forEach((r) => Object.assign(r, patch));
@@ -77,6 +85,12 @@ export function fakeDb({ users = {}, tables = {}, errors = {} } = {}) {
       const q = {
         select() { return q; },
         update(p) { patch = p; return q; },
+        delete() { removing = true; return q; },
+        async insert(row) {
+          if (errors[table]) return { error: errors[table] };
+          (tables[table] ??= []).push(...(Array.isArray(row) ? row : [row]));
+          return { error: null };
+        },
         eq(col, v) { filters.push([col, v]); return q; },
         order(col) { orderCol = col; return q; },
         async maybeSingle() {

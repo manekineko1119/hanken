@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { handle } from '../../supabase/functions/yt-save-playlist/handler.js';
+import { handle, MAX_TRACKS } from '../../supabase/functions/yt-save-playlist/handler.js';
 import { encrypt } from '../../supabase/functions/_shared/crypto.js';
 import { makeDeps, post, NOW } from './helpers.js';
 
@@ -33,6 +33,7 @@ const happy = (extra = () => null) => (url, init = {}) => {
   if (e) return e;
   const m = init.method ?? 'GET';
   if (url.includes('/playlists') && m === 'POST') return ok({ id: 'NEWPL' });
+  if (url.includes('/playlists') && m === 'GET') return ok({ items: [{ id: new URL(url).searchParams.get('id'), status: { privacyStatus: 'private' } }] });
   if (url.includes('/playlistItems') && m === 'POST') return ok({ id: 'item' });
   throw new Error('unexpected ' + m + ' ' + url);
 };
@@ -67,7 +68,7 @@ test('新しく作る：private で作り、video_id のある曲だけを順に
   assert.equal(u.day_jst, '2026-11-17');
 });
 
-test('2回目：今の項目を全部消してから入れ直す', async () => {
+test('2回目：非公開かを確かめ、新しい曲を全部入れてから前の項目を消す', async () => {
   const router = happy((url, init) => {
     const m = init.method ?? 'GET';
     if (url.includes('/playlistItems') && m === 'GET') return ok({ items: [{ id: 'i1' }, { id: 'i2' }] });
@@ -76,14 +77,89 @@ test('2回目：今の項目を全部消してから入れ直す', async () => {
   });
   const { deps, reqs, db } = await setup({ tracks: [trk(1), trk(2)], playlist: { youtube_playlist_id: 'OLD', status: 'saved', title: '半券：バンドA' }, router });
   const j = await (await call(deps)).json();
-  assert.deepEqual(yt(reqs), ['GET playlistItems', 'DELETE playlistItems', 'DELETE playlistItems', 'POST playlistItems', 'POST playlistItems']);
-  assert.equal(new URL(reqs[0].url).searchParams.get('playlistId'), 'OLD');
-  assert.deepEqual(reqs.slice(1, 3).map((r) => new URL(r.url).searchParams.get('id')), ['i1', 'i2']);
-  assert.equal(reqs[3].body.snippet.playlistId, 'OLD');
+  assert.deepEqual(yt(reqs), ['GET playlists', 'GET playlistItems', 'POST playlistItems', 'POST playlistItems', 'DELETE playlistItems', 'DELETE playlistItems']);
+  assert.equal(new URL(reqs[0].url).searchParams.get('part'), 'status');
+  assert.equal(new URL(reqs[0].url).searchParams.get('id'), 'OLD');
+  assert.equal(new URL(reqs[1].url).searchParams.get('playlistId'), 'OLD');
+  assert.equal(reqs[2].body.snippet.playlistId, 'OLD');
+  assert.deepEqual(reqs.slice(4).map((r) => new URL(r.url).searchParams.get('id')), ['i1', 'i2']);
   assert.equal(j.youtubePlaylistId, 'OLD');
   assert.equal(j.inserted, 2);
-  // 1 + 50×2 + 50×2 = 201（見積もりと同じ）
-  assert.equal(db.tables.api_usage[0].units, 201);
+  // 確かめ 1 + list 1 + 50×2 + 50×2 = 202（見積もりと同じ）
+  assert.equal(db.tables.api_usage[0].units, 202);
+});
+
+test('作り直しの途中で追加が失敗しても、前の曲は消さない（空のプレイリストにしない）。回数は戻す', async () => {
+  const router = happy((url, init) => {
+    const m = init.method ?? 'GET';
+    if (url.includes('/playlistItems') && m === 'GET') return ok({ items: [{ id: 'i1' }] });
+    if (url.includes('/playlistItems') && m === 'POST' && videoOf(init) === 'v2') return { status: 500, body: {} };
+    if (url.includes('/playlistItems') && m === 'DELETE') return { status: 204, body: null };
+    return null;
+  });
+  const { deps, reqs, db } = await setup({ tracks: [trk(1), trk(2)], playlist: { youtube_playlist_id: 'OLD', status: 'saved', title: '半券：バンドA' }, router });
+  const res = await call(deps);
+  assert.equal(res.status, 502);
+  assert.ok(!yt(reqs).includes('DELETE playlistItems'));
+  assert.equal(db.tables.user_daily_usage.find((r) => r.kind === 'save').count, 0);
+});
+
+test('作り直し：YouTube で公開・限定公開に変えられていたら、何も変えずに NOT_PRIVATE（回数は数える）', async () => {
+  for (const privacyStatus of ['public', 'unlisted']) {
+    const router = happy((url, init) => {
+      if (url.includes('/playlists') && (init.method ?? 'GET') === 'GET') return ok({ items: [{ id: 'OLD', status: { privacyStatus } }] });
+      return null;
+    });
+    const { deps, reqs, db } = await setup({ tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD', status: 'saved', title: '半券：バンドA' }, router });
+    const res = await call(deps);
+    assert.equal(res.status, 409);
+    const j = await res.json();
+    assert.equal(j.error.code, 'NOT_PRIVATE');
+    assert.match(j.error.message, /非公開に戻して/);
+    assert.deepEqual(yt(reqs), ['GET playlists']);
+    assert.equal(db.tables.api_usage[0].units, 1);
+    assert.equal(db.tables.user_daily_usage.find((r) => r.kind === 'save').count, 1);
+  }
+});
+
+test('作り直し：全員の枠が残り少なければ、確かめの呼び出しもせずに QUOTA（回数は戻す）', async () => {
+  const { deps, reqs, db } = await setup({
+    tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD', status: 'saved', title: '半券：バンドA' }, router: happy(),
+    tables: { api_usage: [{ day_pt: '2026-11-16', units: 9499, searches: 0 }] },
+  });
+  const res = await call(deps);
+  assert.equal(res.status, 429);
+  assert.equal(reqs.length, 0);
+  assert.equal(db.tables.api_usage[0].units, 9499);
+  assert.equal(db.tables.user_daily_usage.find((r) => r.kind === 'save').count, 0);
+});
+
+test('作り直し：公開の状態を確かめられなければ、何も変えずに止まる', async () => {
+  const router = happy((url, init) => (url.includes('/playlists') && (init.method ?? 'GET') === 'GET' ? { status: 500, body: {} } : null));
+  const { deps, reqs } = await setup({ tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD', status: 'saved', title: '半券：バンドA' }, router });
+  const res = await call(deps);
+  assert.equal(res.status, 502);
+  assert.deepEqual(yt(reqs), ['GET playlists']);
+});
+
+test('YouTube 側で消されていた（playlists.list が空）：新しく作る', async () => {
+  const router = happy((url, init) => (url.includes('/playlists') && (init.method ?? 'GET') === 'GET' ? ok({ items: [] }) : null));
+  const { deps, reqs, db } = await setup({ tracks: [trk(1)], playlist: { youtube_playlist_id: 'GONE', status: 'saved' }, router });
+  const j = await (await call(deps)).json();
+  assert.deepEqual(yt(reqs), ['GET playlists', 'POST playlists', 'POST playlistItems']);
+  assert.equal(j.youtubePlaylistId, 'NEWPL');
+});
+
+test(`1回に入れる曲は ${MAX_TRACKS} 曲まで（超えたら何も使わずに BAD_INPUT）`, async () => {
+  const many = Array.from({ length: MAX_TRACKS + 1 }, (_, i) => trk(i + 1));
+  const { deps, reqs, db } = await setup({ tracks: many, router: happy() });
+  const res = await call(deps);
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error.message, new RegExp(`${MAX_TRACKS}曲まで`));
+  assert.equal(reqs.length, 0);
+  assert.equal(db.rpcCalls.length, 0);
+  const { deps: d2 } = await setup({ tracks: many.slice(0, MAX_TRACKS), router: happy() });
+  assert.equal((await call(d2)).status, 200);
 });
 
 test('項目が50件を超えるときは、次のページも取って消す', async () => {
@@ -97,21 +173,21 @@ test('項目が50件を超えるときは、次のページも取って消す', 
   });
   const { deps, reqs } = await setup({ tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD', title: '半券：バンドA' }, router });
   await call(deps);
-  assert.deepEqual(yt(reqs), ['GET playlistItems', 'GET playlistItems', 'DELETE playlistItems', 'DELETE playlistItems', 'POST playlistItems']);
+  assert.deepEqual(yt(reqs), ['GET playlists', 'GET playlistItems', 'GET playlistItems', 'POST playlistItems', 'DELETE playlistItems', 'DELETE playlistItems']);
 });
 
-test('YouTube 側で消されていた（404）：新しく作る', async () => {
+test('YouTube 側で消されていた（playlistItems が 404）：新しく作る', async () => {
   const router = happy((url, init) => {
     if (url.includes('/playlistItems') && (init.method ?? 'GET') === 'GET') return { status: 404, body: { error: { message: 'x' } } };
     return null;
   });
   const { deps, reqs, db } = await setup({ tracks: [trk(1)], playlist: { youtube_playlist_id: 'GONE', status: 'saved' }, router });
   const j = await (await call(deps)).json();
-  assert.deepEqual(yt(reqs), ['GET playlistItems', 'POST playlists', 'POST playlistItems']);
+  assert.deepEqual(yt(reqs), ['GET playlists', 'GET playlistItems', 'POST playlists', 'POST playlistItems']);
   assert.equal(j.youtubePlaylistId, 'NEWPL');
   assert.equal(db.tables.playlists[0].youtube_playlist_id, 'NEWPL');
-  // 1（list）+ 50（作成）+ 50（追加）
-  assert.equal(db.tables.api_usage[0].units, 101);
+  // 1（確かめ）+ 1（list）+ 50（作成）+ 50（追加）
+  assert.equal(db.tables.api_usage[0].units, 102);
 });
 
 test('追加で動画が見つからない（404）曲は飛ばして続ける', async () => {
@@ -143,6 +219,8 @@ test('途中で失敗：使った単位が残り、エラーに inserted が入�
   assert.equal(j.error.code, 'UPSTREAM');
   assert.equal(j.inserted, 2);
   assert.equal(db.tables.api_usage[0].units, 200); // 作成50 + 追加3回（成功2・失敗1）
+  // 失敗した保存は、本人の1日の回数に数えない
+  assert.equal(db.tables.user_daily_usage.find((r) => r.kind === 'save').count, 0);
   const p = db.tables.playlists[0];
   assert.equal(p.status, 'draft');
   assert.equal(p.youtube_playlist_id, 'NEWPL');
@@ -235,8 +313,8 @@ test('作り直し：YouTube に残っている本当の項目数で枠を確か
   const res = await call(deps);
   assert.equal(res.status, 429);
   assert.equal((await res.json()).error.code, 'QUOTA');
-  assert.deepEqual(yt(reqs), ['GET playlistItems']);
-  assert.equal(db.tables.api_usage[0].units, 9301); // list の1単位だけ残る
+  assert.deepEqual(yt(reqs), ['GET playlists', 'GET playlistItems']);
+  assert.equal(db.tables.api_usage[0].units, 9302); // 確かめと list の2単位だけ残る
   assert.equal(db.tables.user_daily_usage.find((r) => r.kind === 'save').count, 0);
   assert.equal(db.tables.playlists[0].status, 'saved');
 });
@@ -250,7 +328,7 @@ test('作り直し：残りの項目が多くても、枠に入るなら消し�
   });
   const { deps, db } = await setup({ tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD', title: '半券：バンドA' }, router });
   assert.equal((await call(deps)).status, 200);
-  assert.equal(db.tables.api_usage[0].units, 1 + 150 + 50);
+  assert.equal(db.tables.api_usage[0].units, 1 + 1 + 150 + 50);
 });
 
 test('単位の予約に失敗したら、本人の回数も戻す', async () => {
@@ -346,19 +424,19 @@ test('再保存で名前が変わっていたら、YouTube の名前も更新す
   const { deps, reqs, db } = await setup({ tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD', status: 'saved', title: '前の名前' }, router: existing() });
   const res = await call(deps, { playlistId: PL, title: '新しい名前' });
   assert.equal(res.status, 200);
-  assert.deepEqual(yt(reqs), ['GET playlistItems', 'PUT playlists', 'DELETE playlistItems', 'POST playlistItems']);
-  const put = reqs[1];
+  assert.deepEqual(yt(reqs), ['GET playlists', 'GET playlistItems', 'PUT playlists', 'POST playlistItems', 'DELETE playlistItems']);
+  const put = reqs[2];
   assert.equal(new URL(put.url).searchParams.get('part'), 'snippet');
   assert.deepEqual(put.body, { id: 'OLD', snippet: { title: '新しい名前' } });
-  // 単位：list 1 + 項目1件の削除 50 + 追加 50 + 名前の更新 50 = 151
-  assert.equal(db.tables.api_usage[0].units, 151);
+  // 単位：確かめ 1 + list 1 + 項目1件の削除 50 + 追加 50 + 名前の更新 50 = 152
+  assert.equal(db.tables.api_usage[0].units, 152);
 });
 
 test('再保存で名前が同じなら、名前の更新はしない', async () => {
   const { deps, reqs, db } = await setup({ tracks: [trk(1)], playlist: { youtube_playlist_id: 'OLD', status: 'saved', title: '同じ' }, router: existing() });
   await call(deps, { playlistId: PL, title: '同じ' });
   assert.ok(!yt(reqs).includes('PUT playlists'));
-  assert.equal(db.tables.api_usage[0].units, 101);
+  assert.equal(db.tables.api_usage[0].units, 102);
 });
 
 test('名前の更新が失敗したら、曲を消す前に止まる（UPSTREAM）', async () => {

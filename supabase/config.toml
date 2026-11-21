@@ -450,6 +450,10 @@ verify_jwt = true
 entrypoint = "./functions/yt-connect-callback/index.js"
 verify_jwt = false
 
+[functions.yt-connect-finish]
+entrypoint = "./functions/yt-connect-finish/index.js"
+verify_jwt = true
+
 [functions.yt-disconnect]
 entrypoint = "./functions/yt-disconnect/index.js"
 verify_jwt = true

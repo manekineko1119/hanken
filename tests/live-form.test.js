@@ -70,7 +70,7 @@ test('planArtistChanges：1組足す → insert 1件（id なし）', () => {
   assert.deepEqual(r.deletes, []);
 });
 
-test('planArtistChanges：混在（空の名前は捨て、知らない id は insert）', () => {
+test('planArtistChanges：混在（空の名前は捨て、知らない id はその id で insert）', () => {
   const r = planArtistChanges(ex, [
     { id: 'c', name: 'C' },
     { name: '   ' },
@@ -84,7 +84,41 @@ test('planArtistChanges：混在（空の名前は捨て、知らない id は i
   ]);
   assert.deepEqual(r.deletes, ['b']);
   assert.deepEqual(r.inserts, [
-    { name: 'Z', position: 1 },
+    { id: 'zzz', name: 'Z', position: 1 },
     { name: 'N', position: 2 },
   ]);
+});
+
+test('planArtistChanges：読み込んだ id を渡すと、読み込んだあとにほかで足された出演者は消さない', () => {
+  // 画面を開いたときは a・b。そのあと別の端末で n が足された。
+  const now = [...ex.slice(0, 2), { id: 'n', name: 'N', position: 2 }];
+  const r = planArtistChanges(now, [{ id: 'a', name: 'A' }], ['a', 'b']);
+  assert.deepEqual(r.deletes, ['b']);
+  assert.deepEqual(r.updates.map((u) => u.id), ['a']);
+});
+
+test('planArtistChanges：読み込んだ id を渡さなければ、今までどおり（フォームにない行は全部消す）', () => {
+  const r = planArtistChanges(ex, [{ id: 'a', name: 'A' }]);
+  assert.deepEqual(r.deletes.sort(), ['b', 'c']);
+});
+
+test('planArtistChanges：新しい出演者に画面で付けた id があれば、その id で入れる（再試行で二重にしない）', () => {
+  const r1 = planArtistChanges(ex, [...ex, { id: 'new-1', name: 'N' }], ['a', 'b', 'c']);
+  assert.deepEqual(r1.inserts, [{ id: 'new-1', name: 'N', position: 3 }]);
+  // 1回目の insert は DB に入ったが返事が届かなかった → もう一度押すと、同じ id なので update になる
+  const now = [...ex, { id: 'new-1', name: 'N', position: 3 }];
+  const r2 = planArtistChanges(now, [...ex, { id: 'new-1', name: 'N' }], ['a', 'b', 'c']);
+  assert.deepEqual(r2.inserts, []);
+  assert.deepEqual(r2.deletes, []);
+  assert.ok(r2.updates.some((u) => u.id === 'new-1'));
+});
+
+test('deletableIds：開いたときの id ＋この画面で作った id。新しいライブは null', async () => {
+  const { newArtist, deletableIds } = await import('../src/core/live-form.js');
+  const state = { loadedIds: ['a'] };
+  const n1 = newArtist(state);
+  const n2 = newArtist(state);
+  assert.notEqual(n1.id, n2.id);
+  assert.deepEqual(deletableIds(state), ['a', n1.id, n2.id]);
+  assert.equal(deletableIds({ loadedIds: null }), null);
 });

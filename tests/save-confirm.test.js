@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { splitTracks, saveSummary, saveErrorInfo, resolveErrorInfo, cleanName } from '../src/core/save-confirm.js';
+import { splitTracks, saveSummary, saveErrorInfo, resolveErrorInfo, cleanName, unwrapResolve } from '../src/core/save-confirm.js';
 
 const tracks = [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }, { id: 'c', title: 'C' }];
 
@@ -87,4 +87,22 @@ test('saveErrorInfo: BUSY（保存中）はサーバーの文言を出し、つ�
   assert.equal(r.message, '保存中です。少し待ってからもう一度押してください');
   assert.equal(r.reconnect, false);
   assert.equal(saveErrorInfo({ code: 'BUSY' }).message, '保存中です。少し待ってからもう一度押してください');
+});
+
+test('unwrapResolve: quota があれば、ここまでの結果を持つ QUOTA の Error にする。なければそのまま返す', () => {
+  const ok = { tracks: [{ id: 'a' }], searchesLeft: 3 };
+  assert.equal(unwrapResolve(ok), ok);
+  assert.throws(
+    () => unwrapResolve({ quota: { code: 'QUOTA', message: '今日はこれ以上' }, tracks: [{ id: 'a' }], searchesLeft: 0 }),
+    (e) => e.code === 'QUOTA' && e.message === '今日はこれ以上' && e.tracks.length === 1 && e.searchesLeft === 0,
+  );
+});
+
+test('saveErrorInfo: NOT_PRIVATE はサーバーの文（なければ「非公開に戻して」）', () => {
+  assert.match(saveErrorInfo({ code: 'NOT_PRIVATE' }).message, /非公開に戻して/);
+  assert.equal(saveErrorInfo({ code: 'NOT_PRIVATE', message: 'サーバーの文' }).message, 'サーバーの文');
+  assert.equal(saveErrorInfo({ code: 'NOT_PRIVATE' }).reconnect, false);
+});
+test('saveErrorInfo: BAD_INPUT はサーバーの文があればそれ（50曲までなど）', () => {
+  assert.equal(saveErrorInfo({ code: 'BAD_INPUT', message: '1回に保存できるのは50曲までです' }).message, '1回に保存できるのは50曲までです');
 });

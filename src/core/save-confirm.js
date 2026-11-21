@@ -3,6 +3,9 @@ const NAME_MAX = 150; // サーバー（yt-save-playlist）の上限と同じ
 
 const QUOTA_MESSAGE = '今日の YouTube の枠がいっぱいです。日本時間の17時ごろ（冬は17時、夏は16時）に戻ります';
 
+// サーバーが日本語の文を返していれば、それを使う（'FUNCTION_FAILED' などの決まった英字は使わない）。
+const serverText = (err) => (typeof err?.message === 'string' && /[^\x00-\x7F]/.test(err.message) ? err.message : null);
+
 const count = (n) => (Number.isFinite(n) && n > 0 ? Math.floor(n) : 0);
 
 // 曲（id・title）と、探した結果（id・videoId・videoTitle）を、見つかった曲と見つからなかった曲に分ける。順番は曲の並びのまま。
@@ -42,8 +45,11 @@ export function saveErrorInfo(err) {
   if (code === 'BUSY') {
     return { message: typeof err.message === 'string' && err.message ? err.message : '保存中です。少し待ってからもう一度押してください', reconnect: false };
   }
+  if (code === 'NOT_PRIVATE') {
+    return { message: serverText(err) ?? 'YouTube でこのプレイリストが非公開ではなくなっています。YouTube で非公開に戻してから、もう一度押してください', reconnect: false };
+  }
   if (code === 'BAD_INPUT') {
-    return { message: '入れられる曲がありません。先に曲を探してください', reconnect: false };
+    return { message: serverText(err) ?? '入れられる曲がありません。先に曲を探してください', reconnect: false };
   }
   return { message: '保存できませんでした。通信を確かめて、もう一度押してください', reconnect: false };
 }
@@ -57,4 +63,11 @@ export function resolveErrorInfo(err) {
 export function cleanName(s) {
   const t = String(s ?? '').trim();
   return t && t.length <= NAME_MAX ? t : null;
+}
+
+// 曲を探した結果。上限に届いたとき（quota）は、ここまでの結果を持つ QUOTA の Error にする（画面は e.tracks を使う）。
+export function unwrapResolve(data) {
+  if (!data?.quota) return data;
+  const { quota, ...rest } = data;
+  throw Object.assign(new Error(quota.message ?? 'QUOTA'), { ...rest, code: quota.code ?? 'QUOTA', message: quota.message ?? 'QUOTA' });
 }

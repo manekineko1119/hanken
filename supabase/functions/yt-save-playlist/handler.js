@@ -6,8 +6,11 @@ import { getAccessToken } from '../_shared/youtube-auth.js';
 const TIMEOUT_MS = 8000;
 const API = 'https://www.googleapis.com/youtube/v3';
 const COST = { insert: 50, delete: 50, list: 1, create: 50, update: 50 };
+const PRE_UNITS = 2; // 作り直しの確かめ（playlists.list と playlistItems.list の1ページ目）
 const LOCK_SECONDS = 120; // 保存の鍵の長さ。途中で落ちても、これを過ぎれば自然に空く
 const TITLE_MAX = 150; // YouTube のプレイリスト名の上限
+// 1回の保存で入れる曲の上限。1人の保存で、全員の1日の枠（9,500単位）を使い切らないようにする。
+export const MAX_TRACKS = 50;
 
 function coded(code, message, extra = {}) {
   const e = new Error(message);
@@ -100,6 +103,7 @@ export async function handle(req, deps) {
     const playable = tr.data.filter((t) => t.video_id);
     skipped = tr.data.length - playable.length;
     if (playable.length === 0) return fail('BAD_INPUT', '入れられる曲がありません。先に曲を探してください', 400);
+    if (playable.length > MAX_TRACKS) return fail('BAD_INPUT', `1回に保存できるのは${MAX_TRACKS}曲までです`, 400);
 
     const title = (body.title ?? '').trim() || playlist.title;
     if (!title || title.length > TITLE_MAX) return fail('BAD_INPUT', '題名が正しくありません', 400);
@@ -115,9 +119,33 @@ export async function handle(req, deps) {
     let token;
     token = await getAccessToken(deps.db, user.id, deps);
 
-    // 作り直し：まず今の項目を数える（list は1単位）。YouTube 側でプレイリストが消されていたら、新しく作る。
+    // 作り直し：まず YouTube 側で非公開のままかを確かめる（list は1単位）。
+    // 公開・限定公開に変えられていたら、何も変えずに止める（「非公開で保存」と表示しているため）。
+    // YouTube 側でプレイリストが消されていたら、新しく作る。
     let ytId = playlist.youtube_playlist_id;
     let ids = [];
+    let checkUnits = 0;
+    const quotaFull = () => fail('QUOTA', '今日の YouTube の枠がいっぱいです。日本時間の17時ごろ（冬は17時、夏は16時）に戻ります', 429);
+    if (ytId) {
+      // 確かめの呼び出し（公開の状態・今の項目）の分も、呼ぶ前に全員の枠から取っておく。
+      const pre = await incrementUsage(deps.db, user.id, now, { kind: 'save', units: PRE_UNITS });
+      reserved = PRE_UNITS;
+      if (!canSpend(pre.units - PRE_UNITS, PRE_UNITS)) {
+        await refundAll();
+        return quotaFull();
+      }
+      const res = await yt('GET', 'playlists', { part: 'status', id: ytId }, token, null, COST.list);
+      checkUnits += COST.list;
+      if (res.status === 404) ytId = null;
+      else if (!res.ok) throw await failed(res, 'プレイリストを確かめ');
+      else {
+        const item = (await res.json())?.items?.[0];
+        if (!item) ytId = null;
+        else if (item.status?.privacyStatus !== 'private') {
+          throw coded('NOT_PRIVATE', 'YouTube でこのプレイリストが非公開ではなくなっています。YouTube で非公開に戻してから、もう一度押してください');
+        }
+      }
+    }
     if (ytId) {
       let pageToken;
       do {
@@ -133,22 +161,20 @@ export async function handle(req, deps) {
     // YouTube の枠：本当の項目数で見積もりを先に足して、9,500 を超えていたら戻す（消す前に止める）。
     // 作り直しで名前が変わっていたら、YouTube 側の名前も更新する（playlists.update：50単位）。
     const rename = !!ytId && title !== playlist.title;
-    const estimate = estimateSaveUnits({ existingItems: ids.length, count: playable.length, isNew: !ytId }) + (rename ? COST.update : 0);
-    const u = await incrementUsage(deps.db, user.id, now, { kind: 'save', units: estimate });
-    reserved = estimate;
-    if (!canSpend(u.units - estimate, estimate)) {
+    const estimate = estimateSaveUnits({ existingItems: ids.length, count: playable.length, isNew: !ytId })
+      + (rename ? COST.update : 0) + checkUnits;
+    // 先に取っておいた分（reserved）との差だけ足す。
+    const extra = Math.max(0, estimate - reserved);
+    const u = await incrementUsage(deps.db, user.id, now, { kind: 'save', units: extra });
+    reserved += extra;
+    if (!canSpend(u.units - extra, extra)) {
       await refundAll();
-      return fail('QUOTA', '今日の YouTube の枠がいっぱいです。日本時間の17時ごろ（冬は17時、夏は16時）に戻ります', 429);
+      return quotaFull();
     }
 
     if (rename) {
       const res = await yt('PUT', 'playlists', { part: 'snippet' }, token, { id: ytId, snippet: { title } }, COST.update);
       if (!res.ok) throw await failed(res, '名前を変え');
-    }
-
-    for (const id of ids) {
-      const res = await yt('DELETE', 'playlistItems', { id }, token, null, COST.delete);
-      if (!res.ok && res.status !== 404) throw await failed(res, '今の曲を消');
     }
 
     if (!ytId) {
@@ -170,6 +196,13 @@ export async function handle(req, deps) {
       inserted += 1;
     }
 
+    // 新しい曲を全部入れてから、前からある項目を消す（途中で止まっても、空のプレイリストにならない）。
+    // 前の保存が途中で止まって残った項目も、ここで消える。
+    for (const id of ids) {
+      const res = await yt('DELETE', 'playlistItems', { id }, token, null, COST.delete);
+      if (!res.ok && res.status !== 404) throw await failed(res, '前の曲を消');
+    }
+
     await settle();
     const done = await deps.db.from('playlists').update({
       status: 'saved', title, youtube_playlist_id: ytId, saved_at: now.toISOString(),
@@ -179,11 +212,14 @@ export async function handle(req, deps) {
       youtubePlaylistId: ytId, url: `https://music.youtube.com/playlist?list=${ytId}`, inserted, skipped,
     }, 200, origin, deps.env);
   } catch (e) {
-    // 失敗でも、使った単位は記録に残す。YouTube をまだ呼んでいなければ、回数も戻す。
-    if (spent === 0) await refundAll(); else await settle();
+    // 失敗した保存は、本人の回数に数えない（やり直しで1日の回数を使い切らないように）。
+    // ただし非公開でなかったとき（NOT_PRIVATE）は数える（直すのは YouTube 側なので、くり返し押させない）。
+    // 使った単位は、全員の枠を守るため記録に残す。
+    if (e?.code === 'NOT_PRIVATE') await settle(); else await refundAll();
     const extra = { inserted, skipped };
     const send = (code, status) => json({ error: { code, message: e.message }, ...extra }, status, origin, deps.env);
     if (e?.code === 'YT_RECONNECT') return send('YT_RECONNECT', 403);
+    if (e?.code === 'NOT_PRIVATE') return send('NOT_PRIVATE', 409);
     if (e?.code === 'QUOTA') return send('QUOTA', 429);
     if (e?.code === 'UPSTREAM') return send('UPSTREAM', 502);
     throw e;
