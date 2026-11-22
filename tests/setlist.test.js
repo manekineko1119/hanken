@@ -91,3 +91,39 @@ test('toSetlist: M と数字だけの曲名は消さない', () => {
   assert.deepEqual(titles(toSetlist(lines('M1 曲A'))), ['曲A']);
   assert.deepEqual(titles(toSetlist(lines('曲A', 'M1 曲B'))), ['曲A', 'M1 曲B']);
 });
+
+test('toSetlist: 番号付きのセトリでは、番号のない行を曲にしない', () => {
+  const r = toSetlist(lines('冬のワンマン2026 TOUR', '2026.11.22 @港町ホール', 'M1 曲A', 'M2 曲B', 'MC', 'M3 曲C', 'EN1 曲D', 'EN2 曲B', 'サイン'));
+  assert.deepEqual(titles(r), ['曲A', '曲B', '曲C', '曲D', '曲B']);
+  assert.deepEqual(r.sections, [{ before_index: 2, label: 'MC' }, { before_index: 3, label: 'EN' }]);
+  assert.deepEqual(titles(toSetlist(lines('ライブ名', '1. 曲A', '2. 曲B', '3. 曲C'))), ['曲A', '曲B', '曲C']);
+});
+
+test('toSetlist: 番号付きのセトリでも要確認の印を残す', () => {
+  const r = toSetlist([{ text: 'ライブ名' }, { text: '1. 曲A', confidence: 0.5 }, { text: '2. 曲B', confidence: 0.9 }, { text: '3. 曲C' }]);
+  assert.deepEqual(r.songs, [
+    { title: '曲A', uncertain: true }, { title: '曲B', uncertain: false }, { title: '曲C', uncertain: false },
+  ]);
+});
+
+test('toSetlist: 番号付きが2行だけなら、いままでどおり', () => {
+  assert.deepEqual(titles(toSetlist(lines('タイトル', 'M1 曲A', 'M2 曲B'))), ['タイトル', 'M1 曲A', 'M2 曲B']);
+});
+
+test('toSetlist: 番号付きのセトリの中の「7 Rings」は、次の番号でなければ捨てる側にならず曲名の数字', () => {
+  const r = toSetlist(lines('1. 曲A', '2. 曲B', '3. 曲C', '4 曲D'));
+  assert.deepEqual(titles(r), ['曲A', '曲B', '曲C', '曲D']);
+});
+
+test('toSetlist: M1：曲A・M1:曲A', () => {
+  assert.deepEqual(titles(toSetlist(lines('M1：曲A'))), ['曲A']);
+  assert.deepEqual(titles(toSetlist(lines('M1:曲A'))), ['曲A']);
+});
+
+test('toSetlist: アンコールの番号付き（区切りを入れる・すでにあれば足さない）', () => {
+  const r = toSetlist(lines('1. 曲A', '2. 曲B', '3. 曲C', 'アンコール', 'アンコール1 曲D', 'EN 2 曲E'));
+  assert.deepEqual(titles(r), ['曲A', '曲B', '曲C', '曲D', '曲E']);
+  assert.deepEqual(r.sections, [{ before_index: 3, label: 'アンコール' }]);
+  const r2 = toSetlist(lines('M1 曲A', 'M2 曲B', 'M3 曲C', 'W.EN1 曲D'));
+  assert.deepEqual(r2.sections, [{ before_index: 3, label: 'W.EN' }]);
+});
