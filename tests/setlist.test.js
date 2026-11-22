@@ -121,9 +121,40 @@ test('toSetlist: M1：曲A・M1:曲A', () => {
 });
 
 test('toSetlist: アンコールの番号付き（区切りを入れる・すでにあれば足さない）', () => {
-  const r = toSetlist(lines('1. 曲A', '2. 曲B', '3. 曲C', 'アンコール', 'アンコール1 曲D', 'EN 2 曲E'));
+  const r = toSetlist(lines('1. 曲A', '2. 曲B', '3. 曲C', 'アンコール', 'アンコール1 曲D', 'アンコール2 曲E'));
   assert.deepEqual(titles(r), ['曲A', '曲B', '曲C', '曲D', '曲E']);
   assert.deepEqual(r.sections, [{ before_index: 3, label: 'アンコール' }]);
   const r2 = toSetlist(lines('M1 曲A', 'M2 曲B', 'M3 曲C', 'W.EN1 曲D'));
   assert.deepEqual(r2.sections, [{ before_index: 3, label: 'W.EN' }]);
+});
+
+test('toSetlist: 番号と曲名が2行に割れても曲にする', () => {
+  assert.deepEqual(titles(toSetlist(lines('M1 曲A', 'M2 曲B', 'M3 曲C', 'M4', '曲D', 'M5 曲E'))), ['曲A', '曲B', '曲C', '曲D', '曲E']);
+  assert.deepEqual(titles(toSetlist(lines('1. 曲A', '2. 曲B', '3. 曲C', '④', '曲D'))), ['曲A', '曲B', '曲C', '曲D']);
+  assert.deepEqual(titles(toSetlist(lines('1. 曲A', '2. 曲B', '3. 曲C', '4.'))), ['曲A', '曲B', '曲C']);
+});
+
+test('toSetlist: 番号が飛んでも、あとの曲を失わない', () => {
+  assert.deepEqual(titles(toSetlist(lines('1 曲A', '2 曲B', '3 曲C', '5 曲E', '6 曲F'))), ['曲A', '曲B', '曲C', '曲E', '曲F']);
+  assert.deepEqual(titles(toSetlist(lines('1 曲A', '2 曲B', '7 Rings', '3 曲C'))), ['曲A', '曲B', '曲C']);
+});
+
+test('toSetlist: 区切りのあとで番号が振り直されてもよい', () => {
+  const r = toSetlist(lines('1. A', '2. B', '3. C', 'EN', '1 Delta', '2 Epsilon'));
+  assert.deepEqual(titles(r), ['A', 'B', 'C', 'Delta', 'Epsilon']);
+  assert.deepEqual(r.sections, [{ before_index: 3, label: 'EN' }]);
+});
+
+test('toSetlist: 番号付きのセトリの「M87 (live)」は番号のない行として捨てる', () => {
+  assert.deepEqual(titles(toSetlist(lines('1. Alpha', '2. Beta', '3. Gamma', 'M87 (live)'))), ['Alpha', 'Beta', 'Gamma']);
+});
+
+test('toSetlist: 番号なしのセトリの「E1 Visa」は曲名のまま', () => {
+  assert.deepEqual(titles(toSetlist(lines('曲A', 'E1 Visa', '曲B'))), ['曲A', 'E1 Visa', '曲B']);
+  assert.deepEqual(titles(toSetlist(lines('EN1 a', 'EN2 b', 'E1 Visa'))), ['EN1 a', 'EN2 b', 'E1 Visa']);
+});
+
+test('toSetlist: アンコールの種類が変わったら区切りを足す', () => {
+  const r = toSetlist(lines('1. A', '2. B', '3. C', 'EN1 D', 'EN2 E', 'W.EN1 F'));
+  assert.deepEqual(r.sections, [{ before_index: 3, label: 'EN' }, { before_index: 5, label: 'W.EN' }]);
 });

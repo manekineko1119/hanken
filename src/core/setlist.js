@@ -40,56 +40,100 @@ const BARE_NUM = /^([0-9０-９]{1,3})\s+(.+)$/;
 const isUncertain = (c) => typeof c === 'number' && !(Number.isFinite(c) && c >= UNCERTAIN_BELOW);
 const isSectionKey = (key) => SECTION_WORDS.has(key) || SECTION_WORDS.has(key.replace(/[0-9]+$/, ''));
 
+// 行頭の番号の数（①・M4・4. など）。読めなければ null。
+function numOf(raw) {
+  const c = raw.charCodeAt(0);
+  if (c >= 0x2460 && c <= 0x2473) return c - 0x245f;
+  if (c >= 0x3251 && c <= 0x325f) return c - 0x3251 + 21;
+  if (c >= 0x32b1 && c <= 0x32bf) return c - 0x32b1 + 36;
+  const m = raw.match(/[0-9０-９]+/);
+  return m ? Number(m[0].normalize('NFKC')) : null;
+}
+const PREFIX_ONLY = /^[MＭmｍ]\s*[-－ー]?\s*[0-9０-９]+$/;
+
+// 番号付きのセトリの1行を見分ける。st：{ last（さっきの番号）, fresh（区切りの直後）}。
+function classify(raw, st) {
+  // 次の番号としてありそうか：さっきより大きく3つ先まで。区切りの直後と最初は 1〜3 から。
+  const plausible = (n) => n !== null
+    && ((n > st.last && n <= st.last + 3) || ((st.fresh || st.last === 0) && n >= 1 && n <= 3));
+  const sec = (text) => {
+    const key = normalizeName(text);
+    if (!key) return { kind: 'skip' };
+    return isSectionKey(key) ? { kind: 'section', text } : null;
+  };
+  const enc = raw.match(ENCORE_SONG);
+  if (enc && enc[2].trim()) {
+    return { kind: 'encore', label: enc[1].replace(/\s+/g, ''), text: enc[2].trim(), n: numOf(enc[0].slice(enc[1].length)) };
+  }
+  for (const re of MARKED_PREFIX) {
+    if (!re.test(raw)) continue;
+    const rest = raw.replace(re, '').trim();
+    const n = numOf(raw);
+    if (!rest) return plausible(n) ? { kind: 'prefix', n } : { kind: 'other' };
+    return sec(rest) || { kind: 'song', text: rest, n };
+  }
+  if (PREFIX_ONLY.test(raw)) {
+    const n = numOf(raw.slice(1));
+    return plausible(n) ? { kind: 'prefix', n } : { kind: 'other' };
+  }
+  const m = raw.match(M_SPACE) || raw.match(BARE_NUM);
+  if (m) {
+    const n = numOf(raw.replace(/^[MＭmｍ]\s*[-－ー]?\s*/, ''));
+    if (plausible(n)) {
+      const rest = m[m.length - 1].trim();
+      return sec(rest) || { kind: 'song', text: rest, n };
+    }
+  }
+  return sec(raw) || { kind: 'other' };
+}
+
 // 番号付きのセトリ（番号のついた曲が3行以上）：番号のない行（ライブ名・日付・サインなど）は曲にしない。
 // 番号付きでなければ null。
 function numberedSetlist(lines) {
+  const rows = lines
+    .map((l) => ({ raw: String(l?.text ?? '').trim(), unc: isUncertain(l?.confidence) }))
+    .filter((r) => r.raw);
   const songs = [];
   const sections = [];
-  let numbered = 0; // 番号付きの曲の行数
-  let main = 0; // 通常の番号（1, 2, 3…）の曲の数
-  let lastEncore = false;
-  for (const line of lines) {
-    const raw = String(line?.text ?? '').trim();
-    if (!raw) continue;
-    const uncertain = isUncertain(line.confidence);
-    const enc = raw.match(ENCORE_SONG);
-    if (enc && enc[2].trim()) {
-      const label = enc[1].replace(/\s+/g, '');
+  const st = { last: 0, fresh: false };
+  let main = 0; // 通常の番号の曲の数
+  let numbered = 0; // アンコールの番号の曲も入れた数
+  let encoreLabel = null;
+  for (let i = 0; i < rows.length; i++) {
+    const { raw, unc } = rows[i];
+    const c = classify(raw, st);
+    if (c.kind === 'section') {
+      sections.push({ before_index: songs.length, label: c.text });
+      st.fresh = true;
+    } else if (c.kind === 'encore') {
       const last = sections[sections.length - 1];
-      if (!lastEncore && !(last && last.before_index === songs.length)) {
-        sections.push({ before_index: songs.length, label });
+      const label = c.label.toUpperCase();
+      if (label !== encoreLabel && !(last && last.before_index === songs.length)) {
+        sections.push({ before_index: songs.length, label: c.label });
       }
-      songs.push({ title: enc[2].trim(), uncertain });
+      encoreLabel = label;
+      songs.push({ title: c.text, uncertain: unc });
       numbered++;
-      lastEncore = true;
-      continue;
+      st.last = 0; // アンコールのあとは、番号が 1 から振り直されてもよい
+      st.fresh = true;
+    } else if (c.kind === 'song') {
+      songs.push({ title: c.text, uncertain: unc });
+      main++; numbered++;
+      encoreLabel = null;
+      st.last = c.n ?? st.last + 1; st.fresh = false;
+    } else if (c.kind === 'prefix') {
+      // 番号と曲名が2行に割れたとき：次の行が番号のない行なら、それを曲名にする。
+      const next = rows[i + 1];
+      if (next && classify(next.raw, st).kind === 'other') {
+        songs.push({ title: next.raw, uncertain: unc || next.unc });
+        main++; numbered++;
+        encoreLabel = null;
+        st.last = c.n ?? st.last + 1; st.fresh = false;
+        i++;
+      }
     }
-    let rest = null;
-    for (const re of MARKED_PREFIX) {
-      if (re.test(raw)) { rest = raw.replace(re, '').trim(); break; }
-    }
-    let marked = rest !== null;
-    if (!marked) {
-      const m = raw.match(M_SPACE) || (() => {
-        const b = raw.match(BARE_NUM);
-        return b && Number(b[1].normalize('NFKC')) === main + 1 ? b : null;
-      })();
-      if (m) { rest = m[m.length - 1].trim(); marked = true; }
-    }
-    const text = marked ? rest : raw;
-    const key = normalizeName(text);
-    if (!key) continue;
-    if (isSectionKey(key)) {
-      sections.push({ before_index: songs.length, label: text });
-      continue;
-    }
-    if (!marked) continue; // 番号のない行は捨てる
-    songs.push({ title: text, uncertain });
-    numbered++;
-    main++;
-    lastEncore = false;
   }
-  return numbered >= 3 ? { songs, sections } : null;
+  return main >= 2 && numbered >= 3 ? { songs, sections } : null;
 }
 
 // 貼り付けた文字を行に分ける（空行も残す）。
