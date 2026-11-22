@@ -8,14 +8,34 @@ import { cleanName } from '../core/save-confirm.js';
 import { moveTrackTo, maxDropIndex } from '../core/reorder.js';
 import { attachDrag, cancelActiveDrag } from '../ui/drag-reorder.js';
 import { replaceTrack, moveTrack, addManualTrack, hasPopularity } from '../core/prep.js';
+import { renameTrack, addSetlistTrack } from '../core/setlist-edit.js';
 
 const SAVE_FAILED = '保存できませんでした。通信を確かめてください';
 
 // 編集モードでないときは、曲名だけの静かな行。編集モードでは、つまみ（≡）・上へ・下へ・消すが出る。
 // 編集モードのときは { li, handle } を返す。
-function trackRow(t, i, tracks, on, editing, busy) {
+// setlist：曲名を押すと、その場で直せる。要確認の曲には印を付ける。
+function setlistName(t, i, on, busy, rename) {
+  if (rename?.index === i) {
+    const okBtn = el('button', { type: 'button', class: 'primary', disabled: busy, text: '決める' });
+    okBtn.addEventListener('click', rename.finish);
+    const cancel = el('button', { type: 'button', disabled: busy, text: 'やめる' });
+    cancel.addEventListener('click', rename.cancel);
+    return el('span', { class: 'artist-name' }, el('span', { class: 'artist-edit song-rename' }, rename.input, okBtn, cancel));
+  }
+  const name = el('button', { type: 'button', class: 'song-title', disabled: busy, 'aria-label': `${t.title} の曲名を直す`, text: t.title });
+  name.addEventListener('click', () => on.startRename(i));
+  return el('span', { class: 'artist-name' },
+    el('span', { class: 'num', text: `${i + 1}. ` }), name,
+    t.uncertain ? el('span', { class: 'tag', text: '要確認' }) : null);
+}
+
+function trackRow(t, i, tracks, on, editing, busy, setlist = null) {
+  const nameNode = () => (setlist
+    ? setlistName(t, i, on, busy, setlist.rename)
+    : el('span', { class: 'artist-name', text: `${i + 1}. ${t.title}` }));
   if (!editing) {
-    return el('li', { class: 'artist-row' }, el('span', { class: 'artist-name', text: `${i + 1}. ${t.title}` }));
+    return el('li', { class: 'artist-row' }, nameNode());
   }
   const trash = el('button', { type: 'button', class: 'trash', 'aria-label': `${t.title} を消す`, title: '消す', disabled: busy }, trashIcon());
   trash.addEventListener('click', () => on.remove(i));
@@ -29,7 +49,7 @@ function trackRow(t, i, tracks, on, editing, busy) {
   });
   const li = el('li', { class: 'artist-row editing' },
     handle,
-    el('span', { class: 'artist-name', text: `${i + 1}. ${t.title}` }),
+    nameNode(),
     trash);
   return { li, handle };
 }
@@ -40,10 +60,11 @@ export function renderPlaylistEdit(container, ctx) {
   const fromPrep = ctx.query?.from === 'prep';
   const confirmHref = playlistHref(id, { fromPrep, confirm: true });
   loadView(container, ctx, () => getPlaylist(id), (pl) => {
-    if (!pl || pl.kind !== 'prep') {
+    if (!pl || !['prep', 'setlist'].includes(pl.kind)) {
       setChildren(container, backLink('#/prep', '戻る'), el('p', { class: 'note', text: 'このプレイリストは見つかりませんでした' }));
       return;
     }
+    const isSetlist = pl.kind === 'setlist';
     const back = !fromPrep && pl.live_id ? `#/live/${encodeURIComponent(pl.live_id)}` : '#/prep';
     let tracks = pl.tracks;
     let rest = pl.candidates ?? { popular: [], recent: [] };
@@ -83,6 +104,13 @@ export function renderPlaylistEdit(container, ctx) {
 
     const on = {
       remove: (i) => {
+        if (isSetlist) {
+          // セトリは入れ替えの候補がない。消すと減るだけ。
+          const next = tracks.filter((_, k) => k !== i);
+          const at = { i: Math.min(i, next.length - 1), role: 'del' };
+          persist(next, rest, { ok: at, fail: { i, role: 'del' } });
+          return;
+        }
         const r = replaceTrack(tracks, rest, i, pl.artist_name);
         // 消したあと：同じ場所に次の曲が入るので、その行の「消す」へ。失敗したら元の行の「消す」へ。
         const at = { i: Math.min(i, r.tracks.length - 1), role: 'del' };
@@ -92,13 +120,47 @@ export function renderPlaylistEdit(container, ctx) {
         const next = moveTrack(tracks, i, dir);
         if (next !== tracks) persist(next, rest, { ok: { i: i + (dir === 'up' ? -1 : 1), role: 'handle' }, fail: { i, role: 'handle' } });
       },
+      startRename: (i) => {
+        if (busy) return;
+        renamingAt = i;
+        songInput.value = tracks[i].title;
+        message = '';
+        draw();
+        queueMicrotask(() => { songInput.focus(); songInput.select(); });
+      },
       drop: (from, to) => {
         const next = moveTrackTo(tracks, from, to);
         if (next !== tracks) persist(next, rest);
       },
     };
 
+    // セトリの曲名を直す。決めると「要確認」は外れる（同じ名前のまま決めても、確かめた印になる）。
+    let renamingAt = null;
+    const songInput = el('input', { type: 'text', maxlength: '100', 'aria-label': '曲名' });
+    const rename = {
+      get index() { return renamingAt; },
+      input: songInput,
+      finish: async () => {
+        if (busy || renamingAt === null) return;
+        if (!songInput.value.trim()) { message = '曲名を入れてください'; draw(); queueMicrotask(() => songInput.focus()); return; }
+        const i = renamingAt;
+        renamingAt = null;
+        await persist(renameTrack(tracks, i, songInput.value), rest);
+      },
+      cancel: () => { renamingAt = null; message = ''; draw(); },
+    };
+    songInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); rename.finish(); }
+      if (e.key === 'Escape') rename.cancel();
+    });
+
     const add = async () => {
+      if (isSetlist) {
+        const next = addSetlistTrack(tracks, input.value, pl.artist_name);
+        if (next.length === tracks.length) return;
+        if (await persist(next, rest)) input.value = '';
+        return;
+      }
       const r = addManualTrack(tracks, input.value, pl.artist_name);
       if (r.duplicate) { message = '同じ曲がもう入っています'; draw(); return; }
       if (r.tracks === tracks) return;
@@ -201,13 +263,21 @@ export function renderPlaylistEdit(container, ctx) {
       return [el('h1', { text: pl.title }), rename];
     }
 
+    // セトリ：画像・文字から読み直す（置き換えの確かめは、読み取りの画面でする）。
+    const reread = el('button', { type: 'button', class: 'link', text: '画像・文字から読み直す' });
+    reread.addEventListener('click', () => {
+      if (!busy && pl.live_id && pl.live_artist_id) location.hash = `#/live/${encodeURIComponent(pl.live_id)}/setlist/${encodeURIComponent(pl.live_artist_id)}`;
+    });
+    const canReread = isSetlist && Boolean(pl.live_id && pl.live_artist_id);
+
     function draw() {
       const typed = input.value;
+      reread.disabled = busy;
       const list = el('ul', { class: 'list' });
       cancelActiveDrag();
       const maxIndex = maxDropIndex(tracks);
       tracks.forEach((t, i) => {
-        const r = trackRow(t, i, tracks, on, editing, busy);
+        const r = trackRow(t, i, tracks, on, editing, busy, isSetlist ? { rename } : null);
         if (r.li) {
           list.append(r.li);
           attachDrag(r.handle, r.li, list, { from: i, maxIndex, onDrop: on.drop });
@@ -229,9 +299,11 @@ export function renderPlaylistEdit(container, ctx) {
         backLink(back, '戻る'),
         ...titleBlock(),
         unreflected ? el('p', { class: 'note', role: 'status', text: 'YouTube Music にまだ反映していません' }) : null,
-        !hasPopularity(tracks, rest) ? el('p', { class: 'note', text: '人気の順のデータがないため、新しい順です' }) : null,
+        isSetlist && tracks.some((t) => t.uncertain) ? el('p', { class: 'note', text: '確かめてほしい曲に「要確認」が付いています。曲名を押すと直せます。' }) : null,
+        canReread ? reread : null,
+        !isSetlist && !hasPopularity(tracks, rest) ? el('p', { class: 'note', text: '人気の順のデータがないため、新しい順です' }) : null,
         list,
-        tracks.length < 10 ? el('p', { class: 'note', text: '候補がもうありません。曲名で探して足せます' }) : null,
+        !isSetlist && tracks.length < 10 ? el('p', { class: 'note', text: '候補がもうありません。曲名で探して足せます' }) : null,
         message ? el('p', { class: 'note error', role: 'alert', text: message }) : null,
         el('div', { class: 'artist-edit' }, input, addBtn),
         el('div', { class: 'actions' }, save, toggle),

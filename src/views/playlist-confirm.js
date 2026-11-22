@@ -16,7 +16,7 @@ export function renderPlaylistConfirm(container, ctx) {
     return { pl, status };
   };
   loadView(container, ctx, load, ({ pl, status }) => {
-    if (!pl || pl.kind !== 'prep') {
+    if (!pl || !['prep', 'setlist'].includes(pl.kind)) {
       setChildren(container, backLink('#/prep', '戻る'), el('p', { class: 'note', text: 'このプレイリストは見つかりませんでした' }));
       return;
     }
