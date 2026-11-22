@@ -87,7 +87,7 @@ test('toSetlist: confidence が NaN なら要確認', () => {
 
 test('toSetlist: M と数字だけの曲名は消さない', () => {
   assert.deepEqual(titles(toSetlist(lines('M87'))), ['M87']);
-  assert.deepEqual(titles(toSetlist(lines('M87 (live)'))), ['M87 (live)']);
+  assert.deepEqual(titles(toSetlist(lines('M87 (live)'))), ['M87']); // (live) は曲名の後ろのメモとして除く
   assert.deepEqual(titles(toSetlist(lines('M1 曲A'))), ['曲A']);
   assert.deepEqual(titles(toSetlist(lines('曲A', 'M1 曲B'))), ['曲A', 'M1 曲B']);
 });
@@ -157,4 +157,52 @@ test('toSetlist: 番号なしのセトリの「E1 Visa」は曲名のまま', ()
 test('toSetlist: アンコールの種類が変わったら区切りを足す', () => {
   const r = toSetlist(lines('1. A', '2. B', '3. C', 'EN1 D', 'EN2 E', 'W.EN1 F'));
   assert.deepEqual(r.sections, [{ before_index: 3, label: 'EN' }, { before_index: 5, label: 'W.EN' }]);
+});
+
+test('toSetlist: 曲名の後ろのメモを除く', () => {
+  const one = (t) => titles(toSetlist(lines(t)))[0];
+  assert.equal(one('3.曲C cover'), '曲C');
+  assert.equal(one('4.曲D 同期あり'), '曲D');
+  assert.equal(one('M1 曲E カポ2'), '曲E');
+  assert.equal(one('1.曲F(Acoustic)'), '曲F');
+  assert.equal(one('1.曲F（Acoustic）'), '曲F');
+  assert.equal(one('2.曲G バラードver.'), '曲G');
+  assert.equal(one('2.曲G Acoustic ver.'), '曲G');
+  assert.equal(one('M1 曲H 1'), '曲H');
+  assert.equal(one('0.曲I inst'), '曲I');
+  assert.equal(one('曲J(inst)'), '曲J');
+  assert.equal(one('1.曲K capo 3 同期あり'), '曲K');
+  assert.equal(one('同期あり'), '同期あり');
+  assert.equal(one('Track 2'), 'Track 2');
+  assert.equal(one('Never Forever'), 'Never Forever');
+});
+
+const full = (...a) => toSetlist(lines(...a));
+
+test('toSetlist: 写真の形 a（括弧のメモ・MC(一言)）', () => {
+  assert.deepEqual(titles(full('バンド名', '「ツアー 2023」', '2023.08.19@ 会場', '曲Z(inst)', '1.曲A(Acoustic)', 'MC(一言)', '2.曲B(Acoustic)', 'MC', '3.曲C', 'MC', '4.曲D', 'MC(一言)', '5.曲E')), ['曲A', '曲B', '曲C', '曲D', '曲E']);
+});
+
+test('toSetlist: 写真の形 b（0番から・同期あり）', () => {
+  assert.deepEqual(titles(full('2024/03/07 会場 SETLIST', '--入場SE--', '0.曲Z inst', 'MC 一言', '1.曲A', '2.曲B バラードver.', 'MC', '3.曲C cover', 'MC', '4.曲D 同期あり', 'MC', '5.曲E 同期あり', 'MC', '6.曲F。同期あり', '-だれかさん退散-', 'MC', '7.曲G')), ['曲Z', '曲A', '曲B', '曲C', '曲D', '曲E', '曲F。', '曲G']);
+});
+
+test('toSetlist: 写真の形 c（En1.）', () => {
+  const r = full('20番', '2024/11/02', 'バンド「ライブ vol.2」セトリ', '1. 曲A', '2. 曲B', '3. 曲C', '-MC-', '4. 曲D', '5. 曲E', 'En1. 曲F', 'En2. 曲G');
+  assert.deepEqual(titles(r), ['曲A', '曲B', '曲C', '曲D', '曲E', '曲F', '曲G']);
+  assert.deepEqual(r.sections, [{ before_index: 3, label: '-MC-' }, { before_index: 5, label: 'En' }]);
+});
+
+test('toSetlist: 写真の形 d（番号だけの行・en1）', () => {
+  assert.deepEqual(titles(full('2024.11.15 @会場', '1. 曲A', '2. 曲B', '3. 曲C', 'mc', '4', '曲D', '5. 曲E', 'mc', '7. 曲G', 'en1 曲H', 'en2 曲I')), ['曲A', '曲B', '曲C', '曲D', '曲E', '曲G', '曲H', '曲I']);
+});
+
+test('toSetlist: 写真の形 e（M 番号・カポ・手書きの 1）', () => {
+  assert.deepEqual(titles(full('11/15 会場', 'バンド oneman live project『タイトル』第二夜', 'M1 曲A', 'M2 SONGB', 'M3 SONGC カポ2', 'M4 songd', 'M5 曲E カポ4', '-MC-', 'M7 曲G カポ3', 'M8 曲H 1')), ['曲A', 'SONGB', 'SONGC', 'songd', '曲E', '曲G', '曲H']);
+});
+
+test('toSetlist: アンコールの書き方いろいろ', () => {
+  for (const w of ['En1. 曲A', 'en1 曲A', 'en 1. 曲A', 'EN1曲A']) {
+    assert.deepEqual(titles(full('1. X', '2. Y', '3. Z', w)), ['X', 'Y', 'Z', '曲A'], w);
+  }
 });
