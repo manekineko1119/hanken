@@ -245,3 +245,11 @@ test('toSetlist: 「N.」の後ろが数字なら番号にしない（日付）'
   assert.deepEqual(titles(full('11.22 会場', '1. 曲A', '2. 曲B', '3. 曲C')), ['曲A', '曲B', '曲C']);
   assert.deepEqual(titles(full('11.22 会場')), ['11.22 会場']);
 });
+
+test('toSetlist: Codex の指摘（Version 2・(ver)・(Inst2)・括弧の曲名・1)1979・M の飛び）', () => {
+  assert.deepEqual(titles(full('1. The Version 2', '2. Alpha (ver)', '3. Beta (Inst2)')), ['The Version 2', 'Alpha (ver)', 'Beta (Inst2)']);
+  assert.deepEqual(titles(full('1 Alpha', '2 (Everything)', '3 Gamma', '4 Delta')), ['Alpha', '(Everything)', 'Gamma', 'Delta']);
+  assert.deepEqual(titles(full('1)1979', '2:1985', '3. Closer', '4. Midnight', '5. Outro')), ['1979', '1985', 'Closer', 'Midnight', 'Outro']);
+  assert.deepEqual(titles(full('M1 Alpha', 'M8 Apollo 11')), ['Alpha', 'Apollo 11']);
+  assert.deepEqual(titles(full('M1 Alpha', 'M2 Beta', 'M3 Gamma', 'M8.', 'Apollo 11')), ['Alpha', 'Beta', 'Gamma', 'Apollo 11']);
+});
