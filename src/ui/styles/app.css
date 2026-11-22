@@ -583,3 +583,22 @@ button.link { background: transparent; border: 0; padding: var(--s1) 0; min-heig
 button.link:not(:disabled):hover { color: var(--ink); }
 .artist-edit.rename { margin: var(--s2) 0 var(--s3); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* セトリの画面（フェーズ2）：読み取り・直す・ライブの詳細の入口 */
+.pick-actions { margin-top: var(--s5); }
+.pick { width: 100%; min-height: 56px; font-size: 17px; }
+.paste-box { margin-top: var(--s5); border-top: 1px solid var(--line); padding-top: var(--s3); }
+.paste-box summary { cursor: pointer; color: var(--accent); min-height: 44px; display: flex; align-items: center; }
+.paste-box .actions { margin-top: var(--s3); }
+.note.small { font-size: 12px; margin-top: var(--s6); }
+.setlist-line { flex: 0 0 100%; display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+/* 曲名：下に点線。押すと直せる。要確認の曲には真鍮の小さな札（左の棒や影は付けない） */
+button.song-title {
+  display: inline; min-height: 44px; min-width: 0; padding: 0; border: 0; background: transparent;
+  color: inherit; font: inherit; text-align: left; overflow-wrap: anywhere;
+  text-decoration: underline dotted var(--muted); text-underline-offset: 5px;
+}
+.artist-row.editing button.song-title { flex: none; min-width: 0; padding: 0; }
+.tag { display: inline-block; margin-left: var(--s2); padding: 2px var(--s2); border-radius: 4px; background: var(--accent); color: var(--accent-text); font-family: var(--font); font-size: 12px; font-weight: 600; line-height: 1.4; vertical-align: middle; }
+.song-rename { padding: 0; }
+.song-rename input { flex: 1 1 100%; }

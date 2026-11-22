@@ -10,6 +10,7 @@ import { renderSettings } from './views/settings.js';
 import { renderPrep } from './views/prep-list.js';
 import { renderArtistPick } from './views/artist-pick.js';
 import { renderPlaylistEdit } from './views/playlist-edit.js';
+import { renderSetlistRead } from './views/setlist-read.js';
 import { el, setChildren, setBusy } from './ui/dom.js';
 
 const main = document.querySelector('main');
@@ -25,6 +26,7 @@ const VIEWS = {
   '/lives': renderLives,
   '/live/new': renderLiveEdit,
   '/live/:id/edit': renderLiveEdit,
+  '/live/:id/setlist/:artistId': renderSetlistRead,
   '/live/:id': renderLiveDetail,
   '/artist-pick': renderArtistPick,
   '/playlist/:id': renderPlaylistEdit,
@@ -77,7 +79,7 @@ function onSignedOut() {
 }
 
 function listPathFor({ path, query }) {
-  if (path === '/lives' || path === '/live/:id' || path === '/live/:id/edit') return '/lives';
+  if (path === '/lives' || path === '/live/:id' || path === '/live/:id/edit' || path === '/live/:id/setlist/:artistId') return '/lives';
   if (path === '/prep' || (path === '/playlist/:id' && query.from === 'prep')) return '/prep';
   return null;
 }
