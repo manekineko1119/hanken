@@ -19,7 +19,7 @@ test('toSetlist: 番号を除く', () => {
 });
 
 test('toSetlist: 番号でない数字は残す', () => {
-  assert.deepEqual(titles(toSetlist(lines('1行目の記憶', '17才', '87'))), ['1行目の記憶', '17才', '87']);
+  assert.deepEqual(titles(toSetlist(lines('1行目の記憶', '17才', 'M87'))), ['1行目の記憶', '17才', 'M87']);
 });
 
 test('toSetlist: 区切りは曲に入らず、次の曲の位置で入る', () => {
@@ -77,10 +77,17 @@ test('toSetlist: 番号付きの区切り', () => {
 });
 
 test('toSetlist: 番号だけの行は読み飛ばす', () => {
-  assert.deepEqual(toSetlist(lines('1.', '①', 'M1')), { songs: [], sections: [] });
+  assert.deepEqual(toSetlist(lines('1.', '①', 'M1.')), { songs: [], sections: [] });
 });
 
 test('toSetlist: confidence が NaN なら要確認', () => {
   assert.equal(toSetlist([{ text: 'a', confidence: NaN }]).songs[0].uncertain, true);
   assert.equal(toSetlist([{ text: 'a', confidence: Infinity }]).songs[0].uncertain, true);
+});
+
+test('toSetlist: M と数字だけの曲名は消さない', () => {
+  assert.deepEqual(titles(toSetlist(lines('M87'))), ['M87']);
+  assert.deepEqual(titles(toSetlist(lines('M87 (live)'))), ['M87 (live)']);
+  assert.deepEqual(titles(toSetlist(lines('M1 曲A'))), ['曲A']);
+  assert.deepEqual(titles(toSetlist(lines('曲A', 'M1 曲B'))), ['曲A', 'M1 曲B']);
 });
