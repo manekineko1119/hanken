@@ -21,7 +21,7 @@ function upstream(message) {
 
 function wordConfidence(w) {
   if (typeof w.confidence === 'number') return w.confidence;
-  const cs = (w.symbols ?? []).map((s) => s.confidence).filter((c) => typeof c === 'number');
+  const cs = (w.symbols ?? []).map((s) => s?.confidence).filter((c) => typeof c === 'number');
   return cs.length ? Math.min(...cs) : 0;
 }
 
@@ -36,18 +36,30 @@ function linesOfImage(res, image) {
     text = '';
     conf = null;
   };
+  // SPACE 系は空白、行末・ハイフン止めはそこで行を閉じる（HYPHEN は行末扱い）
+  const applyBreak = (brk) => {
+    if (brk === 'SPACE' || brk === 'SURE_SPACE') {
+      if (text) text += ' ';
+    } else if (brk === 'EOL_SURE_SPACE' || brk === 'LINE_BREAK' || brk === 'HYPHEN') flush();
+  };
   for (const page of res.fullTextAnnotation?.pages ?? []) {
     for (const block of page.blocks ?? []) {
       for (const para of block.paragraphs ?? []) {
         for (const w of para.words ?? []) {
-          const syms = w.symbols ?? [];
-          text += syms.map((s) => s.text ?? '').join('');
-          const c = wordConfidence(w);
-          conf = conf === null ? c : Math.min(conf, c);
-          const brk = syms.length ? syms[syms.length - 1].property?.detectedBreak?.type : undefined;
-          if (brk === 'SPACE' || brk === 'SURE_SPACE') text += ' ';
-          // 行末・ハイフン止めは、そこで行を閉じる
-          else if (brk === 'EOL_SURE_SPACE' || brk === 'LINE_BREAK' || brk === 'HYPHEN') flush();
+          if (!w || typeof w !== 'object') continue;
+          const wc = wordConfidence(w);
+          for (const sym of w.symbols ?? []) {
+            if (!sym || typeof sym !== 'object') continue;
+            const db = sym.property?.detectedBreak;
+            const brk = db?.type;
+            // 前に付く改行（isPrefix）は、この文字の前に反映する
+            if (db?.isPrefix) applyBreak(brk);
+            if (sym.text) {
+              text += sym.text;
+              conf = conf === null ? wc : Math.min(conf, wc);
+            }
+            if (!db?.isPrefix) applyBreak(brk);
+          }
         }
         flush(); // 段落の終わりで残りを閉じる
       }

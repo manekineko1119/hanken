@@ -58,3 +58,28 @@ test('全部 error なら UPSTREAM', () => {
     (e) => e instanceof Error && e.code === 'UPSTREAM',
   );
 });
+
+const symB = (text, type, isPrefix) => ({ text, property: { detectedBreak: { type, ...(isPrefix ? { isPrefix: true } : {}) } } });
+
+test('前に付く LINE_BREAK は直前の文字との間で行を分ける', () => {
+  const r = resp([word('A', 0.7), { symbols: [symB('B', 'LINE_BREAK', true)], confidence: 0.9 }]);
+  assert.deepEqual(linesFromVision({ responses: [r] }), [
+    { text: 'A', confidence: 0.7, image: 0 },
+    { text: 'B', confidence: 0.9, image: 0 },
+  ]);
+});
+
+test('前に付く SPACE は空白を入れる', () => {
+  const r = resp([word('A', 0.7), { symbols: [symB('B', 'SPACE', true)], confidence: 0.9 }]);
+  assert.deepEqual(linesFromVision({ responses: [r] }), [{ text: 'A B', confidence: 0.7, image: 0 }]);
+});
+
+test('単語の途中の LINE_BREAK でも分ける', () => {
+  const r = resp([{ symbols: [symB('A', 'LINE_BREAK'), sym('B')], confidence: 0.8 }]);
+  assert.deepEqual(linesFromVision({ responses: [r] }).map((l) => l.text), ['A', 'B']);
+});
+
+test('null の単語・文字は飛ばす', () => {
+  const r = resp([null, { symbols: [null, sym('A', 'LINE_BREAK')], confidence: 0.8 }]);
+  assert.deepEqual(linesFromVision({ responses: [r] }), [{ text: 'A', confidence: 0.8, image: 0 }]);
+});
