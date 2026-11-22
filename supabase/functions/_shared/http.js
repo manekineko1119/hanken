@@ -1,7 +1,7 @@
 // Edge Functions 共通：CORS・エラーの形・ログインと許可リストの確かめ。
 // Deno 固有の API は使わない（node のテストから読み込む）。
 
-export const ERROR_CODES = ['NOT_ALLOWED', 'QUOTA', 'YT_RECONNECT', 'UPSTREAM', 'BAD_INPUT', 'BUSY', 'NOT_PRIVATE', 'WRONG_USER', 'EXPIRED'];
+export const ERROR_CODES = ['NOT_ALLOWED', 'QUOTA', 'YT_RECONNECT', 'UPSTREAM', 'BAD_INPUT', 'BUSY', 'NOT_PRIVATE', 'WRONG_USER', 'EXPIRED', 'LIMIT'];
 
 const LOCAL_ORIGINS = ['http://localhost:8080', 'http://127.0.0.1:8080'];
 

@@ -465,3 +465,7 @@ verify_jwt = true
 [functions.yt-save-playlist]
 entrypoint = "./functions/yt-save-playlist/index.js"
 verify_jwt = true
+
+[functions.setlist-read]
+entrypoint = "./functions/setlist-read/index.js"
+verify_jwt = true

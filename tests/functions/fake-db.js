@@ -10,6 +10,7 @@ const PK_COLS = {
   video_cache: ['artist_key', 'title_key'],
   api_usage: ['day_pt'],
   user_daily_usage: ['user_id', 'day_jst', 'kind'],
+  vision_usage: ['month_pt'],
 };
 
 export function fakeDb({ users = {}, tables = {}, errors = {} } = {}) {
@@ -44,6 +45,23 @@ export function fakeDb({ users = {}, tables = {}, errors = {} } = {}) {
         if (!row || (row.save_locked_until && Date.parse(row.save_locked_until) > Date.now())) return { data: false, error: null };
         row.save_locked_until = new Date(Date.now() + a.p_seconds * 1000).toISOString();
         return { data: true, error: null };
+      }
+      // reserve_vision の偽物（SQL 関数と同じ判定：月 800 枚 → 一人 1 日 10 回の順。通ったときだけ両方に足す）
+      if (name === 'reserve_vision') {
+        rpcCalls.push({ name, ...a });
+        if (a.p_user_id == null || a.p_day_jst == null || a.p_month_pt == null) throw new Error('null argument');
+        if (!Number.isInteger(a.p_images) || a.p_images < 1 || a.p_images > 4) throw new Error('p_images must be 1..4');
+        const vrows = (tables.vision_usage ??= []);
+        let m = vrows.find((r) => r.month_pt === a.p_month_pt);
+        if (!m) vrows.push((m = { month_pt: a.p_month_pt, images: 0 }));
+        if (m.images + a.p_images > 800) return { data: 'month', error: null };
+        const urows = (tables.user_daily_usage ??= []);
+        let u = urows.find((r) => r.user_id === a.p_user_id && r.day_jst === a.p_day_jst && r.kind === 'setlist');
+        if ((u?.count ?? 0) >= 10) return { data: 'day', error: null };
+        m.images += a.p_images;
+        if (!u) urows.push((u = { user_id: a.p_user_id, day_jst: a.p_day_jst, kind: 'setlist', count: 0 }));
+        u.count += 1;
+        return { data: 'ok', error: null };
       }
       if (name !== 'increment_usage') throw new Error('unexpected rpc ' + name);
       rpcCalls.push(a);
