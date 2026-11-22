@@ -1,5 +1,5 @@
 // YouTube の枠と、一人あたりの上限（設計 7.1・7.2）。
-export const LIMITS = { save: 5, search: 30, setlist: 20, globalSearch: 90 };
+export const LIMITS = { save: 5, search: 30, setlist: 10, globalSearch: 90 };
 
 function dayIn(timeZone, now) {
   return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);

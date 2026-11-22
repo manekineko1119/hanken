@@ -31,5 +31,5 @@ test('canSpend', () => {
 });
 
 test('LIMITS', () => {
-  assert.deepEqual(LIMITS, { save: 5, search: 30, setlist: 20, globalSearch: 90 });
+  assert.deepEqual(LIMITS, { save: 5, search: 30, setlist: 10, globalSearch: 90 });
 });
