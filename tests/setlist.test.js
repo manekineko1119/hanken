@@ -19,7 +19,7 @@ test('toSetlist: 番号を除く', () => {
 });
 
 test('toSetlist: 番号でない数字は残す', () => {
-  assert.deepEqual(titles(toSetlist(lines('1行目の記憶', '17才', 'M87'))), ['1行目の記憶', '17才', 'M87']);
+  assert.deepEqual(titles(toSetlist(lines('1行目の記憶', '17才', '87'))), ['1行目の記憶', '17才', '87']);
 });
 
 test('toSetlist: 区切りは曲に入らず、次の曲の位置で入る', () => {
@@ -57,4 +57,30 @@ test('toSetlistTracks', () => {
   assert.deepEqual(toSetlistTracks([{ title: '曲A', uncertain: true }], 'バンドA'), [
     { title: '曲A', artistName: 'バンドA', source: 'setlist', isLatest: false, uncertain: true },
   ]);
+});
+
+test('toSetlist: 記号なしの数字は、曲の順番と同じときだけ番号', () => {
+  assert.deepEqual(titles(toSetlist(lines('7 Rings'))), ['7 Rings']);
+  assert.deepEqual(titles(toSetlist(lines('01 曲A', '02 曲B'))), ['曲A', '曲B']);
+  assert.deepEqual(titles(toSetlist(lines('曲A', '曲B', '7 Rings'))), ['曲A', '曲B', '7 Rings']);
+  assert.deepEqual(titles(toSetlist(lines('100 Reasons'))), ['100 Reasons']);
+  assert.deepEqual(titles(toSetlist(lines('19 時の曲'))), ['19 時の曲']);
+});
+
+test('toSetlist: 番号付きの区切り', () => {
+  for (const w of ['EN1', 'EN 1', 'アンコール1', 'MC①', 'MC2']) {
+    const r = toSetlist(lines('曲A', w));
+    assert.deepEqual(r.songs.length, 1, w);
+    assert.deepEqual(r.sections, [{ before_index: 1, label: w }], w);
+  }
+  assert.deepEqual(titles(toSetlist(lines('MC Hammer'))), ['MC Hammer']);
+});
+
+test('toSetlist: 番号だけの行は読み飛ばす', () => {
+  assert.deepEqual(toSetlist(lines('1.', '①', 'M1')), { songs: [], sections: [] });
+});
+
+test('toSetlist: confidence が NaN なら要確認', () => {
+  assert.equal(toSetlist([{ text: 'a', confidence: NaN }]).songs[0].uncertain, true);
+  assert.equal(toSetlist([{ text: 'a', confidence: Infinity }]).songs[0].uncertain, true);
 });

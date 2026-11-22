@@ -9,17 +9,24 @@ const SECTION_WORDS = new Set([
   'ダブルアンコール', '転換',
 ]);
 
-// 行頭の番号：1. / 01 / 1) / １． / ① / M1 / M-1.（全角・空白あり）。
-const NUMBER_PREFIX = [
-  /^[\u2460-\u2473\u3251-\u325F\u32B1-\u32BF]\s*/,
-  /^[MＭmｍ]\s*[-－ー]?\s*[0-9０-９]+(?:\s*[.．)）、:：]\s*|\s+)/,
-  /^[0-9０-９]{1,3}(?:\s*[.．)）、:：]\s*|\s+)/,
+// 行頭の番号（記号付き）：1. / 1) / １． / ① / M1 / M-1.（全角・空白あり）。いつも除く。
+const MARKED_PREFIX = [
+  /^[①-⑳㉑-㉟㊱-㊿]\s*/,
+  /^[MＭmｍ]\s*[-－ー]?\s*[0-9０-９]+(?:\s*[.．)）、:：]\s*|\s+|$)/,
+  /^[0-9０-９]{1,3}\s*[.．)）、:：]\s*/,
 ];
+// 数字と空白だけの番号（01 曲A）。曲名の一部のこともあるので、曲の順番と同じ数のときだけ除く。
+const BARE_PREFIX = /^([0-9０-９]{1,3})\s+/;
 
-function stripNumber(s) {
-  for (const re of NUMBER_PREFIX) {
-    const rest = s.replace(re, '');
-    if (rest !== s && rest.trim()) return rest.trim();
+// 番号だけの行は ''（読み飛ばす）。
+function stripNumber(s, position) {
+  for (const re of MARKED_PREFIX) {
+    if (re.test(s)) return s.replace(re, '').trim();
+  }
+  const m = s.match(BARE_PREFIX);
+  if (m && Number(m[1].normalize('NFKC')) === position) {
+    const rest = s.slice(m[0].length).trim();
+    if (rest) return rest;
   }
   return s;
 }
@@ -36,15 +43,16 @@ export function toSetlist(lines) {
   for (const line of lines) {
     const raw = String(line?.text ?? '').trim();
     if (!raw) continue;
-    const text = stripNumber(raw);
+    const text = stripNumber(raw, songs.length + 1);
     const key = normalizeName(text);
-    if (!key) continue; // 記号だけの行
-    if (SECTION_WORDS.has(key)) {
+    if (!key) continue; // 記号だけの行・番号だけの行
+    // EN1・MC② のように末尾に番号が付いた区切りも区切り。
+    if (SECTION_WORDS.has(key) || SECTION_WORDS.has(key.replace(/[0-9]+$/, ''))) {
       sections.push({ before_index: songs.length, label: text });
       continue;
     }
     const c = line.confidence;
-    songs.push({ title: text, uncertain: typeof c === 'number' && c < UNCERTAIN_BELOW });
+    songs.push({ title: text, uncertain: typeof c === 'number' && !(Number.isFinite(c) && c >= UNCERTAIN_BELOW) });
   }
   return { songs, sections };
 }
