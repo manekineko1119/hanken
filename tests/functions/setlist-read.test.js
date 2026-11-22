@@ -95,7 +95,9 @@ test('成功：Vision を1回呼び、数えてから行を返す', async () => 
     lines: [{ text: SECRET_LINE, confidence: 0.9, image: 0 }, { text: SECRET_LINE, confidence: 0.9, image: 1 }],
   });
   assert.equal(calls.length, 1);
-  assert.equal(reqs[0].url, `${VISION_URL}?key=test-key`);
+  assert.equal(reqs[0].url, VISION_URL);
+  assert.ok(!reqs[0].url.includes('test-key'));
+  assert.equal(reqs[0].headers['X-Goog-Api-Key'], 'test-key');
   assert.equal(reqs[0].method, 'POST');
   assert.deepEqual(reqs[0].body, visionBody([B64, B64]));
   const r = reserveCalls(db);
@@ -184,4 +186,15 @@ test('キーはエラーの本文に出ない', async () => {
   const { deps } = makeDeps({ env, fetchMap: () => ({ status: 500, body: {} }) });
   const res = await handle(post({ images: [B64] }), deps);
   assert.ok(!(await res.text()).includes('test-key'));
+});
+
+test('Content-Length が大きすぎる：読む前に 400 BAD_INPUT（何も呼ばない）', async () => {
+  const { deps, calls, db } = makeDeps({ env, fetchMap: () => ({ body: okVision() }) });
+  const req = post({ images: [B64] });
+  req.headers.set('Content-Length', String(4 * 1024 * 1024 + 64 * 1024 + 1));
+  const res = await handle(req, deps);
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error.code, 'BAD_INPUT');
+  assert.equal(calls.length, 0);
+  assert.equal(reserveCalls(db).length, 0);
 });

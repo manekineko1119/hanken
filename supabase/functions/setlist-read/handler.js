@@ -5,6 +5,7 @@ import { VISION_URL, visionBody, linesFromVision } from '../_shared/vision.js';
 const TIMEOUT_MS = 20000;
 const MAX_IMAGES = 4;
 const MAX_TOTAL_CHARS = 4 * 1024 * 1024; // base64 の文字数の合計（設計 8.2「合わせて 4MB」）
+const MAX_BODY_BYTES = MAX_TOTAL_CHARS + 64 * 1024; // 本文の大きさの上限（JSON の枠の分の余裕つき）
 
 // 画像と読めた文字は、ログにも、エラーの文面にも出さない（F2-05）。ここでは固定の文面だけを使う。
 export async function handle(req, deps) {
@@ -14,6 +15,8 @@ export async function handle(req, deps) {
   const err = (code, msg, status) => errorJson(code, msg, status, origin, deps.env);
 
   // ① 入力を確かめる（何かを呼ぶ前に）
+  const len = Number(req.headers.get('Content-Length'));
+  if (len > MAX_BODY_BYTES) return err('BAD_INPUT', '画像が大きすぎます（合わせて 4MB まで）', 400);
   const body = await readJson(req);
   const images = body?.images;
   if (!Array.isArray(images) || images.length < 1 || images.length > MAX_IMAGES
@@ -49,9 +52,10 @@ export async function handle(req, deps) {
 
   // ③ Cloud Vision を呼ぶ ④ 行にして返す
   try {
-    const res = await deps.fetch(`${VISION_URL}?key=${encodeURIComponent(key)}`, {
+    const res = await deps.fetch(VISION_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // キーは URL ではなくヘッダーで送る（URL はエラーやログに残りやすいため）。
+      headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key },
       body: JSON.stringify(visionBody(images)),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
