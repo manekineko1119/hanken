@@ -4,10 +4,10 @@ import { unwrapResolve } from '../core/save-confirm.js';
 
 const trackRow = (playlistId, t, i) => ({
   playlist_id: playlistId, position: i, title: t.title, artist_name: t.artistName,
-  source: t.source, is_latest: !!t.isLatest,
+  source: t.source, is_latest: !!t.isLatest, uncertain: !!t.uncertain,
 });
 
-const fromRow = (r) => ({ id: r.id, title: r.title, artistName: r.artist_name, source: r.source, isLatest: r.is_latest });
+const fromRow = (r) => ({ id: r.id, title: r.title, artistName: r.artist_name, source: r.source, isLatest: r.is_latest, uncertain: !!r.uncertain });
 
 function check({ error }) {
   if (error) throw error;
@@ -47,7 +47,7 @@ export async function getPlaylist(id) {
   if (error) throw error;
   if (!data) return null;
   const res = await db.from('playlist_tracks')
-    .select('id, title, artist_name, source, is_latest, position').eq('playlist_id', id).order('position', { ascending: true });
+    .select('id, title, artist_name, source, is_latest, uncertain, position').eq('playlist_id', id).order('position', { ascending: true });
   if (res.error) throw res.error;
   return { ...data, tracks: res.data.map(fromRow) };
 }
@@ -57,7 +57,7 @@ export async function saveTracks(id, tracks, rest) {
   check(await getClient().rpc('replace_playlist_tracks', {
     p_playlist_id: id,
     p_tracks: tracks.map((t, i) => ({
-      position: i, title: t.title, artist_name: t.artistName, source: t.source, is_latest: !!t.isLatest,
+      position: i, title: t.title, artist_name: t.artistName, source: t.source, is_latest: !!t.isLatest, uncertain: !!t.uncertain,
     })),
     p_candidates: rest,
   }));
@@ -84,8 +84,16 @@ export async function getPrepIds(liveId) {
   return new Map(data.filter((r) => r.live_artist_id).map((r) => [r.live_artist_id, r.id]));
 }
 
+// ライブの出演者ごとのセトリの id（なければ入っていない）。
+export async function getSetlistIds(liveId) {
+  const { data, error } = await getClient().from('playlists')
+    .select('id, live_artist_id').eq('live_id', liveId).eq('kind', 'setlist');
+  if (error) throw error;
+  return new Map(data.filter((r) => r.live_artist_id).map((r) => [r.live_artist_id, r.id]));
+}
+
 // Edge Function を呼ぶ。失敗したら { code, message, ...本文のそのほか } を持つ Error を投げる（本文が読めなければ code なし）。
-async function callFunction(name, body) {
+export async function callFunction(name, body) {
   let res;
   try {
     res = await getClient().functions.invoke(name, { body });
