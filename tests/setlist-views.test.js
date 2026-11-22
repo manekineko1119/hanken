@@ -14,6 +14,7 @@ class Element extends EventTarget {
 
   focus() { document.activeElement = this; }
   select() {}
+  querySelector(sel) { const c = sel.slice(1); return this.find((n) => n !== this && n.className === c) ?? null; }
   setAttribute(key, value) {
     this.attributes[key] = String(value);
     if (key === 'value') this.value = String(value);
@@ -49,7 +50,7 @@ globalThis.fetch = async (input, init) => {
     default: throw new Error(`Unexpected request: ${url.pathname}`);
   }
 };
-globalThis.document = { createElement: (tag) => new Element(tag) };
+globalThis.document = { createElement: (tag) => new Element(tag), createElementNS: (_ns, tag) => new Element(tag) };
 globalThis.location = { hostname: 'localhost', hash: '', assign() {} };
 globalThis.confirm = () => true;
 const { renderPlaylistEdit } = await import('../src/views/playlist-edit.js');
@@ -111,4 +112,15 @@ test('読み取りの画面：貼り付けが空なら何もしない。画像�
   const msg = c.find((n) => n.attributes.role === 'alert');
   assert.equal(msg.textContent, '4枚まで選べます');
   assert.equal(location.hash, '#/live/live-1/setlist/a1');
+});
+
+test('セトリの編集：曲名を直している間は、並べ替えと消すを止める', async () => {
+  playlists = [mk()];
+  tracks = [trk('曲A', false), trk('曲B', false)];
+  const c = await render(renderPlaylistEdit, '#/playlist/s1');
+  c.find((n) => n.textContent === '編集').dispatchEvent(new Event('click'));
+  all(c, (n) => n.className === 'song-title')[0].dispatchEvent(new Event('click'));
+  await setImmediate();
+  assert.ok(all(c, (n) => n.className === 'trash').every((n) => n.attributes.disabled === ''));
+  assert.ok(all(c, (n) => n.className === 'handle').every((n) => n.attributes.disabled === ''));
 });

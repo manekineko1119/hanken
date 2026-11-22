@@ -37,10 +37,12 @@ function trackRow(t, i, tracks, on, editing, busy, setlist = null) {
   if (!editing) {
     return el('li', { class: 'artist-row' }, nameNode());
   }
-  const trash = el('button', { type: 'button', class: 'trash', 'aria-label': `${t.title} を消す`, title: '消す', disabled: busy }, trashIcon());
+  // 曲名を直している間は、並べ替え・消すを止める（行の位置がずれて、別の曲を直してしまわないように）。
+  const locked = busy || (setlist?.rename.index ?? null) !== null;
+  const trash = el('button', { type: 'button', class: 'trash', 'aria-label': `${t.title} を消す`, title: '消す', disabled: locked }, trashIcon());
   trash.addEventListener('click', () => on.remove(i));
   const handle = el('button', {
-    type: 'button', class: 'handle', text: '≡', disabled: busy || t.isLatest, 'data-index': String(i),
+    type: 'button', class: 'handle', text: '≡', disabled: locked || t.isLatest, 'data-index': String(i),
     'aria-label': `${t.title} を並べ替える（引きずる。矢印キーの上下でも動かせます）`,
   });
   handle.addEventListener('keydown', (e) => {
@@ -90,6 +92,7 @@ export function renderPlaylistEdit(container, ctx) {
       try {
         await saveTracks(id, tracks, rest);
         if (pl.status === 'saved') unreflected = true;
+        focus.onOk?.();
       } catch {
         ({ tracks, rest } = prev);
         message = SAVE_FAILED;
@@ -144,12 +147,23 @@ export function renderPlaylistEdit(container, ctx) {
         if (busy || renamingAt === null) return;
         if (!songInput.value.trim()) { message = '曲名を入れてください'; draw(); queueMicrotask(() => songInput.focus()); return; }
         const i = renamingAt;
-        renamingAt = null;
-        await persist(renameTrack(tracks, i, songInput.value), rest);
+        // 失敗したら入力欄を開いたまま（打った文字を残す）。成功したら閉じて、その行の曲名へフォーカスを戻す。
+        const ok = await persist(renameTrack(tracks, i, songInput.value), rest, {
+          ok: { i, role: 'title' }, onOk: () => { renamingAt = null; },
+        });
+        if (!ok && ctx.alive()) queueMicrotask(() => songInput.focus());
       },
-      cancel: () => { renamingAt = null; message = ''; draw(); },
+      cancel: () => {
+        const i = renamingAt;
+        renamingAt = null;
+        message = '';
+        focusTo = { i, role: 'title' };
+        draw();
+        focusTo = null;
+      },
     };
     songInput.addEventListener('keydown', (e) => {
+      if (e.isComposing || e.keyCode === 229) return; // 変換の確定の Enter・Esc は無視する
       if (e.key === 'Enter') { e.preventDefault(); rename.finish(); }
       if (e.key === 'Escape') rename.cancel();
     });
@@ -278,15 +292,13 @@ export function renderPlaylistEdit(container, ctx) {
       const maxIndex = maxDropIndex(tracks);
       tracks.forEach((t, i) => {
         const r = trackRow(t, i, tracks, on, editing, busy, isSetlist ? { rename } : null);
-        if (r.li) {
-          list.append(r.li);
-          attachDrag(r.handle, r.li, list, { from: i, maxIndex, onDrop: on.drop });
-          if (focusTo && focusTo.i === i) {
-            const target = focusTo.role === 'del' ? r.li.querySelector('.trash') : r.handle;
-            queueMicrotask(() => target.focus());
-          }
-        } else {
-          list.append(r);
+        const li = r.li ?? r;
+        list.append(li);
+        if (r.li) attachDrag(r.handle, r.li, list, { from: i, maxIndex, onDrop: on.drop });
+        if (focusTo && focusTo.i === i) {
+          const target = focusTo.role === 'title' ? li.querySelector('.song-title')
+            : focusTo.role === 'del' ? li.querySelector('.trash') : r.handle;
+          if (target) queueMicrotask(() => target.focus());
         }
       });
       const toggle = el('button', { type: 'button', text: editing ? '完了' : '編集', disabled: !editing && tracks.length === 0 });

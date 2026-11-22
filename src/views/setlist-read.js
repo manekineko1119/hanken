@@ -4,7 +4,8 @@ import { el, setChildren, backLink, loadView } from '../ui/dom.js';
 import { getLive } from '../data/lives.js';
 import { readSetlistImages, findSetlist, createSetlist, replaceSetlistTracks } from '../data/setlist.js';
 import { linesFromText, toSetlist, toSetlistTracks } from '../core/setlist.js';
-import { fitSize } from '../core/image.js';
+import { fitSize, fitsTotal } from '../core/image.js';
+import { formatDateJa } from '../core/lives.js';
 import { playlistTitle } from '../core/naming.js';
 import { playlistHref } from '../router.js';
 
@@ -17,20 +18,21 @@ const MSG = {
   day: '今日の画像の読み取りはいっぱいです（1日10回まで）。文字を貼り付けて作れます',
   failed: '読み取りに失敗しました。もう一度試すか、文字を貼り付けて作れます',
   saveFailed: '保存できませんでした。通信を確かめてください',
+  tooBig: '画像が大きすぎます。枚数を減らすか、文字を貼り付けて作れます',
   pasteEmpty: '文字を貼り付けてください',
 };
 export const REPLACE_CONFIRM = '今のセトリを、読み取った内容で置き換えますか？';
 
 // 画像を長い辺 1600px までに縮めた JPEG にして、base64（前の「data:…」は付けない）で返す。
-async function toBase64(file) {
+async function toBase64(file, { max = 1600, quality = JPEG_QUALITY } = {}) {
   const bitmap = await createImageBitmap(file);
   try {
-    const { w, h } = fitSize(bitmap.width, bitmap.height);
+    const { w, h } = fitSize(bitmap.width, bitmap.height, max);
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
     canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
-    return canvas.toDataURL('image/jpeg', JPEG_QUALITY).split(',')[1];
+    return canvas.toDataURL('image/jpeg', quality).split(',')[1];
   } finally {
     bitmap.close?.();
   }
@@ -113,11 +115,17 @@ export function renderSetlistRead(container, ctx) {
       run(async () => {
         let images;
         try {
-          images = await Promise.all(files.map(toBase64));
+          images = await Promise.all(files.map((f) => toBase64(f)));
+          // サーバーの 4MB に収まらなければ、画質→大きさの順に下げてやり直す。
+          for (const opt of [{ quality: 0.7 }, { max: 1200, quality: 0.7 }]) {
+            if (fitsTotal(images)) break;
+            images = await Promise.all(files.map((f) => toBase64(f, opt)));
+          }
         } catch {
           say(MSG.failed, { openPaste: true }); // HEIC など、ブラウザが開けない画像
           return;
         }
+        if (!fitsTotal(images)) { say(MSG.tooBig, { openPaste: true }); return; } // サーバーは呼ばない
         let r;
         try {
           r = await readSetlistImages(images);
@@ -138,7 +146,7 @@ export function renderSetlistRead(container, ctx) {
     setChildren(container,
       backLink(back, '戻る'),
       el('h1', { text: 'セトリを作る' }),
-      el('p', { class: 'meta', text: `${artist.name}／${live.date}${venue ? ` ${venue}` : ''}` }),
+      el('p', { class: 'meta', text: `${artist.name}／${formatDateJa(live.date)}${venue ? ` ${venue}` : ''}` }),
       el('div', { class: 'actions pick-actions' }, pick),
       file,
       el('p', { class: 'note', text: '4枚まで。X・インスタのスクショ、セトリの紙の写真が読めます' }),
