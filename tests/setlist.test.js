@@ -87,7 +87,7 @@ test('toSetlist: confidence が NaN なら要確認', () => {
 
 test('toSetlist: M と数字だけの曲名は消さない', () => {
   assert.deepEqual(titles(toSetlist(lines('M87'))), ['M87']);
-  assert.deepEqual(titles(toSetlist(lines('M87 (live)'))), ['M87']); // (live) は曲名の後ろのメモとして除く
+  assert.deepEqual(titles(toSetlist(lines('M87 (live)'))), ['M87 (live)']); // (live) は曲名の一部のことがあるので残す
   assert.deepEqual(titles(toSetlist(lines('M1 曲A'))), ['曲A']);
   assert.deepEqual(titles(toSetlist(lines('曲A', 'M1 曲B'))), ['曲A', 'M1 曲B']);
 });
@@ -168,7 +168,7 @@ test('toSetlist: 曲名の後ろのメモを除く', () => {
   assert.equal(one('1.曲F（Acoustic）'), '曲F');
   assert.equal(one('2.曲G バラードver.'), '曲G');
   assert.equal(one('2.曲G Acoustic ver.'), '曲G');
-  assert.equal(one('M1 曲H 1'), '曲H');
+  assert.equal(one('M1 曲H 1'), '曲H 1'); // 後ろの数字は曲名の一部のことがあるので残す（手で消す）
   assert.equal(one('0.曲I inst'), '曲I');
   assert.equal(one('曲J(inst)'), '曲J');
   assert.equal(one('1.曲K capo 3 同期あり'), '曲K');
@@ -198,11 +198,50 @@ test('toSetlist: 写真の形 d（番号だけの行・en1）', () => {
 });
 
 test('toSetlist: 写真の形 e（M 番号・カポ・手書きの 1）', () => {
-  assert.deepEqual(titles(full('11/15 会場', 'バンド oneman live project『タイトル』第二夜', 'M1 曲A', 'M2 SONGB', 'M3 SONGC カポ2', 'M4 songd', 'M5 曲E カポ4', '-MC-', 'M7 曲G カポ3', 'M8 曲H 1')), ['曲A', 'SONGB', 'SONGC', 'songd', '曲E', '曲G', '曲H']);
+  assert.deepEqual(titles(full('11/15 会場', 'バンド oneman live project『タイトル』第二夜', 'M1 曲A', 'M2 SONGB', 'M3 SONGC カポ2', 'M4 songd', 'M5 曲E カポ4', '-MC-', 'M7 曲G カポ3', 'M8 曲H 1')), ['曲A', 'SONGB', 'SONGC', 'songd', '曲E', '曲G', '曲H 1']);
 });
 
 test('toSetlist: アンコールの書き方いろいろ', () => {
   for (const w of ['En1. 曲A', 'en1 曲A', 'en 1. 曲A', 'EN1曲A']) {
     assert.deepEqual(titles(full('1. X', '2. Y', '3. Z', w)), ['X', 'Y', 'Z', '曲A'], w);
   }
+});
+
+test('toSetlist: 番号付きの曲名の後ろの数字は消さない', () => {
+  assert.deepEqual(titles(full('1. Part 2', '2. Apollo 11', '3. Song 2', '4. Summer of 69')), ['Part 2', 'Apollo 11', 'Song 2', 'Summer of 69']);
+});
+
+test('toSetlist: 番号なしのセトリでは cover・inst・(Live) を除かない', () => {
+  assert.deepEqual(titles(full('Undercover', 'Take Cover', 'Pure Inst', 'Alpha (Live)')), ['Undercover', 'Take Cover', 'Pure Inst', 'Alpha (Live)']);
+  assert.deepEqual(titles(full('1. 曲A cover', '2. 曲B inst', '3. 曲C')), ['曲A', '曲B', '曲C']);
+});
+
+test('toSetlist: 括弧は acoustic・inst・ver.・version の単語だけ除く', () => {
+  const one = (t) => titles(full('1. X', '2. Y', t))[2];
+  assert.equal(one('3. 曲A (Never Again)'), '曲A (Never Again)');
+  assert.equal(one('3. 曲A (Live)'), '曲A (Live)');
+  assert.equal(one('3. 曲A (Remix)'), '曲A (Remix)');
+  assert.equal(one('3. 曲A (Instinct)'), '曲A (Instinct)');
+  assert.equal(one('3. 曲A (Acoustic Ver.)'), '曲A');
+  assert.equal(one('3. 曲A (Instrumental)'), '曲A');
+  assert.equal(one('3. 曲A（バラードver.）'), '曲A');
+  assert.equal(one('3. Love Verbal'), 'Love Verbal');
+  assert.equal(one('3. So Clever.'), 'So Clever.');
+});
+
+test('toSetlist: アンコールのあとも本編の番号の続きを受ける', () => {
+  assert.deepEqual(titles(full('M1 曲A', 'M2 曲B', 'M3 曲C', 'EN1 曲D', 'M4 曲E')), ['曲A', '曲B', '曲C', '曲D', '曲E']);
+  assert.deepEqual(titles(full('1 曲A', '2 曲B', '3 曲C', 'EN1 曲D', '4 曲E')), ['曲A', '曲B', '曲C', '曲D', '曲E']);
+  const ten = Array.from({ length: 9 }, (_, i) => `M${i + 1} 曲${i + 1}`);
+  assert.deepEqual(titles(full(...ten, 'EN1 曲X', 'M10 曲10')), [...ten.map((_, i) => `曲${i + 1}`), '曲X', '曲10']);
+});
+
+test('toSetlist: M 付きの番号は、大きくなればいくつ飛んでも受ける', () => {
+  assert.deepEqual(titles(full('M1 曲A', 'M2 曲B', 'M3 曲C', 'M8 曲H', 'M9 曲I')), ['曲A', '曲B', '曲C', '曲H', '曲I']);
+  assert.deepEqual(titles(full('M1 曲A', 'M2 曲B', 'M3 曲C', 'M8', '曲H')), ['曲A', '曲B', '曲C', '曲H']);
+});
+
+test('toSetlist: 「N.」の後ろが数字なら番号にしない（日付）', () => {
+  assert.deepEqual(titles(full('11.22 会場', '1. 曲A', '2. 曲B', '3. 曲C')), ['曲A', '曲B', '曲C']);
+  assert.deepEqual(titles(full('11.22 会場')), ['11.22 会場']);
 });
