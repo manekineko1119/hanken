@@ -16,7 +16,6 @@
   --accent-text: #1d1c1a;
   --danger: #e8968a;
   --paper: #e9dfc8;     /* 半券の紙（生成り） */
-  --paper-old: #dcd1b8; /* 行ったライブの紙 */
   --ink: #3f3b33;
   --ink-soft: #5e574b;
   --perf: rgba(63, 59, 51, 0.32); /* ミシン目と紙の上のリンクの下線 */
@@ -244,7 +243,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offs
 .row-sub { font-size: 13px; line-height: 1.5; color: var(--muted); }
 .row:focus-visible { outline-offset: -2px; }
 
-/* ライブの一覧：券の大きさはそろえ、これから／行ったを紙の色と切り欠きで示す。 */
+/* ライブの一覧：同じ紙の券で、これから＝半券付き／行った＝半券を切り取ったあと、で示す。 */
 .tickets > li { border-bottom: 0; margin: 0 0 var(--s3); }
 .tickets .row {
   padding: var(--ticket-pad);
@@ -315,11 +314,21 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offs
   .tickets-upcoming .row::before { font-size: 12px; }
 }
 
+/* 行った：「これから」の券から、ミシン目で半券を切り取ったあとの形。
+   幅は半券の分だけ短く、右の上下の角に切り欠きの半分、右の辺はミシン目のちぎれ。 */
 .tickets-past .row {
+  width: calc(100% - var(--stub));
   border-radius: var(--radius-paper) 0 0 var(--radius-paper);
-  background: var(--paper-old);
-  -webkit-mask: radial-gradient(circle 4px at 100% 50%, #0000 95%, #000) 0 0 / 100% 11px repeat-y;
-  mask: radial-gradient(circle 4px at 100% 50%, #0000 95%, #000) 0 0 / 100% 11px repeat-y;
+  -webkit-mask:
+    radial-gradient(circle 3px at 100% 50%, #0000 95%, #000) 0 0 / 100% 8px repeat-y,
+    radial-gradient(circle 8px at 100% 0, #0000 97%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle 8px at 100% 100%, #0000 97%, #000) bottom / 100% 51% no-repeat;
+  -webkit-mask-composite: source-in, source-over, source-over;
+  mask:
+    radial-gradient(circle 3px at 100% 50%, #0000 95%, #000) 0 0 / 100% 8px repeat-y,
+    radial-gradient(circle 8px at 100% 0, #0000 97%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle 8px at 100% 100%, #0000 97%, #000) bottom / 100% 51% no-repeat;
+  mask-composite: intersect, add, add;
 }
 
 /* 紙の上の出演者・曲の一覧。区切りはミシン目。 */

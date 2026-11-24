@@ -406,7 +406,7 @@ for (const [candidate, choose] of [['アーティスト', false], ['候補のア
   });
 }
 
-test('紙の補助文字は生成りと古い紙の両方でコントラスト比が4.5以上', () => {
+test('紙の補助文字は生成りの紙でコントラスト比が4.5以上（行ったの券も同じ紙）', () => {
   const css = readFileSync(new URL('../src/ui/styles/app.css', import.meta.url), 'utf8');
   const luminance = (name) => {
     const [, hex] = css.match(new RegExp(`--${name}: #([a-f0-9]{6});`));
@@ -416,7 +416,7 @@ test('紙の補助文字は生成りと古い紙の両方でコントラスト�
       return sum + weight * linear;
     }, 0);
   };
-  for (const paper of ['paper', 'paper-old']) {
+  for (const paper of ['paper']) {
     const ratio = (luminance(paper) + 0.05) / (luminance('ink-soft') + 0.05);
     assert.ok(ratio >= 4.5, `${paper}: ${ratio.toFixed(2)}:1`);
   }
