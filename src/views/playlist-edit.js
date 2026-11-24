@@ -17,11 +17,11 @@ const SAVE_FAILED = '保存できませんでした。通信を確かめてく�
 // setlist：曲名を押すと、その場で直せる。要確認の曲には印を付ける。
 function setlistName(t, i, on, busy, rename) {
   if (rename?.index === i) {
-    const okBtn = el('button', { type: 'button', class: 'primary', disabled: busy, text: '決める' });
+    const okBtn = el('button', { type: 'button', class: 'primary', disabled: busy, text: '保存' });
     okBtn.addEventListener('click', rename.finish);
-    const cancel = el('button', { type: 'button', disabled: busy, text: 'やめる' });
+    const cancel = el('button', { type: 'button', disabled: busy, text: 'キャンセル' });
     cancel.addEventListener('click', rename.cancel);
-    return el('span', { class: 'artist-name' }, el('span', { class: 'artist-edit song-rename' }, rename.input, okBtn, cancel));
+    return el('span', { class: 'artist-name' }, el('span', { class: 'artist-edit song-rename' }, rename.input, el('span', { class: 'song-rename-actions' }, okBtn, cancel)));
   }
   const name = el('button', { type: 'button', class: 'song-title', disabled: busy, 'aria-label': `${t.title} の曲名を直す`, text: t.title });
   name.addEventListener('click', () => on.startRename(i));

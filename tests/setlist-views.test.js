@@ -95,7 +95,7 @@ test('セトリの編集：要確認の印とお知らせ。入れ替えの文�
   await setImmediate();
   const input = c.find((n) => n.tag === 'input' && n.attributes['aria-label'] === '曲名');
   input.value = ' 曲B直し ';
-  const ok = c.find((n) => n.className === 'primary' && n.textContent === '決める');
+  const ok = c.find((n) => n.className === 'primary' && n.textContent === '保存');
   ok.dispatchEvent(new Event('click'));
   await setImmediate();
   assert.deepEqual(saved.map((t) => [t.title, t.uncertain]), [['曲A', false], ['曲B直し', false]]);

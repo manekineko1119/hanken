@@ -609,5 +609,8 @@ button.song-title {
 }
 .artist-row.editing button.song-title { flex: none; min-width: 0; padding: 0; }
 .tag { display: inline-block; margin-left: var(--s2); padding: 2px var(--s2); border-radius: 4px; background: var(--accent); color: var(--accent-text); font-family: var(--font); font-size: 12px; font-weight: 600; line-height: 1.4; vertical-align: middle; }
-.song-rename { padding: 0; }
+.song-rename { padding: 0; row-gap: var(--s3); }
 .song-rename input { flex: 1 1 100%; }
+/* 曲名を直すときの保存・キャンセル：入力欄から離し、小さめにして左に置く */
+.song-rename-actions { display: flex; gap: var(--s2); width: 100%; margin-bottom: var(--s2); }
+.song-rename-actions button { min-height: 36px; padding: 0 var(--s3); font-size: 14px; }
