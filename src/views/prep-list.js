@@ -29,12 +29,9 @@ function row(p, { selectedId, onListRowClick }) {
     el('span', { class: 'row-sub', text: p.artistName }),
     el('span', { class: 'row-sub', text: liveText(p.live) }),
   ];
-  // セトリの行は、今は押せない（オーナーの決定 2026-11-22）。保存の状態だけ予習と同じに出す。
-  const head = p.kind === 'setlist'
-    ? el('div', { class: 'row' }, ...info)
-    : el('a', { class: 'row', href: playlistHref(p.id, { fromPrep: true }), 'aria-current': p.id === selectedId ? 'true' : null, onclick: onListRowClick }, ...info);
+  // 予習もセトリも、押すと編集の画面（セトリは曲名を押して直せる）を開く。
   return el('li', {},
-    head,
+    el('a', { class: 'row', href: playlistHref(p.id, { fromPrep: true }), 'aria-current': p.id === selectedId ? 'true' : null, onclick: onListRowClick }, ...info),
     p.status === 'saved'
       ? el('p', { class: 'row-status' },
         el('span', { class: 'status status-saved', text: '保存済み' }),
