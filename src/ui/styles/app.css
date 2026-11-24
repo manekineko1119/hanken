@@ -374,7 +374,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offs
 .artist-edit { flex-wrap: wrap; display: flex; align-items: center; gap: var(--s1); padding: 6px 0; }
 .artist-edit input { flex: 1; min-width: 0; }
 .artist-edit button { padding: 0 var(--s2); }
-.field > button { margin-top: var(--s2); }
+.field > button { margin-top: var(--s4); } /* 入力欄から離して、窮屈に見せない */
 .actions { display: flex; flex-wrap: wrap; gap: var(--s3); margin-top: var(--s6); }
 .settings-view > h1 { margin-bottom: var(--s5); }
 .settings-section ~ .settings-section { margin-top: var(--s6); }
