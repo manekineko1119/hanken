@@ -3,6 +3,7 @@ import { getLive, getPlaylistStatuses, deleteLive } from '../data/lives.js';
 import { formatDateJa, liveHeading } from '../core/lives.js';
 import { getPrepIds, getSetlistIds } from '../data/playlists.js';
 import { runStart } from './prep-flow.js';
+import { renderLivePhotos } from './live-photos.js';
 
 const STATUS_LABEL = { none: '未作成', draft: '下書き', saved: '保存済み' };
 const DELETE_CONFIRM = 'このライブを消しますか？アプリの中の予習の記録も消えます。YouTube 上のプレイリストは消えません。';
@@ -85,6 +86,7 @@ export function renderLiveDetail(container, ctx) {
         el('ul', { class: 'list on-paper' }, ...live.artists.map((a, i) => artistRow(a, i, { live, statuses, prepIds, setlistIds, ctx, msg }))),
         msg,
         el('div', { class: 'actions' }, el('a', { class: 'button', href: `#/live/${encodeURIComponent(live.id)}/edit`, text: '編集' }), del),
+        renderLivePhotos(live.id, ctx),
       );
     },
   );

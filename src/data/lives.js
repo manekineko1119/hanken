@@ -1,6 +1,7 @@
 // ライブの保存・読み込み（Supabase）。薄く保つ。判断は src/core/ に置く。
 import { getClient } from '../auth/auth.js';
 import { planArtistChanges } from '../core/live-form.js';
+import { removeLivePhotoFiles } from './photos.js';
 
 function check({ error }) {
   if (error) throw error;
@@ -71,8 +72,10 @@ export async function saveLive(live, artists, loadedIds = null) {
   return id;
 }
 
-export async function deleteLive(id) {
-  check(await getClient().from('lives').delete().eq('id', id));
+// 先に写真のファイルを消す（ライブを消すと行は cascade で消えるが、ファイルは残るため）。消せなければライブも消さない。
+export async function deleteLive(id, db = getClient()) {
+  await removeLivePhotoFiles(id, db);
+  check(await db.from('lives').delete().eq('id', id));
 }
 
 // 出演者ごとの予習・セトリの状態。行がなければ 'none'。

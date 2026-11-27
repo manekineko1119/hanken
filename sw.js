@@ -6,7 +6,7 @@
    - 入れるのは、同じオリジンの静的ファイルだけ。
    - パスはすべて相対（./）。GitHub Pages のサブパスでも動くようにする。
    アプリのファイルを足す・消したときは、PRECACHE_URLS を直し、VERSION を上げる（tests/sw.test.js が漏れを見つける）。 */
-var VERSION = 'v15';
+var VERSION = 'v16';
 var CACHE_PREFIX = 'hanken-';
 var CACHE_NAME = CACHE_PREFIX + VERSION;
 
@@ -33,6 +33,7 @@ var PRECACHE_URLS = [
   './src/core/lives.js',
   './src/core/naming.js',
   './src/core/normalize.js',
+  './src/core/photos.js',
   './src/core/playlist-list.js',
   './src/core/prep.js',
   './src/core/reorder.js',
@@ -42,6 +43,7 @@ var PRECACHE_URLS = [
   './src/core/settings.js',
   './src/core/youtube.js',
   './src/data/lives.js',
+  './src/data/photos.js',
   './src/data/playlists.js',
   './src/data/setlist.js',
   './src/data/settings.js',
@@ -53,6 +55,7 @@ var PRECACHE_URLS = [
   './src/views/artist-pick.js',
   './src/views/live-detail.js',
   './src/views/live-edit.js',
+  './src/views/live-photos.js',
   './src/views/lives.js',
   './src/views/login.js',
   './src/views/placeholder.js',

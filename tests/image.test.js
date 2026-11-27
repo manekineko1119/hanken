@@ -21,3 +21,8 @@ test('totalBase64Length・fitsTotal: 文字数の合計が 4MB 以下ならよ�
   assert.equal(fitsTotal(['aaa', 'bb'], 5), true);
   assert.equal(fitsTotal(['aaa', 'bb'], 4), false);
 });
+
+test('jpegQualitySteps: 高い順の4段階', async () => {
+  const { jpegQualitySteps } = await import('../src/core/image.js');
+  assert.deepEqual(jpegQualitySteps(), [0.85, 0.75, 0.65, 0.55]);
+});

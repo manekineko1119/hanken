@@ -16,3 +16,8 @@ export function totalBase64Length(images) {
 export function fitsTotal(images, max = MAX_TOTAL_BASE64) {
   return totalBase64Length(images) <= max;
 }
+
+// 写真（1MB まで）用：縮めたあと上限を超えたら、次の値で作り直す。最後でも超えたら断る。
+export function jpegQualitySteps() {
+  return [0.85, 0.75, 0.65, 0.55];
+}
