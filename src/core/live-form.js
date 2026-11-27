@@ -94,3 +94,22 @@ export function copyFromPastVenue(state, lives, venue) {
   }
   return copied;
 }
+
+// 詳細の画面で節ごとに直せる項目。
+export const SECTION_FIELDS = {
+  venue: ['venue_address', 'venue_station', 'access_memo'],
+  train: ['last_train_memo', 'afterparty_memo'],
+  impression: ['impression'],
+};
+
+// その節のキーだけを取り出し、前後の空白を除いて、空なら null にする。
+export function sectionPatch(section, values) {
+  const keys = SECTION_FIELDS[section];
+  if (!keys) throw new Error(`知らない節です：${section}`);
+  const patch = {};
+  for (const k of keys) {
+    const v = String(values?.[k] ?? '').trim();
+    patch[k] = v === '' ? null : v;
+  }
+  return patch;
+}

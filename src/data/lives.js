@@ -99,3 +99,8 @@ export async function getPlaylistStatuses(liveId) {
 export async function setArtistItunesId(liveArtistId, itunesArtistId) {
   check(await getClient().from('live_artists').update({ itunes_artist_id: itunesArtistId }).eq('id', liveArtistId));
 }
+
+// lives の1行を patch だけで更新する（upsert なし。出演者には触らない）。
+export async function updateLiveFields(id, patch) {
+  check(await getClient().from('lives').update(patch).eq('id', id));
+}

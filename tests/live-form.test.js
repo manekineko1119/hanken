@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateLive, planArtistChanges, venueSuggestions, copyFromPastVenue, VENUE_COPY_KEYS } from '../src/core/live-form.js';
+import { validateLive, planArtistChanges, venueSuggestions, copyFromPastVenue, VENUE_COPY_KEYS, sectionPatch, SECTION_FIELDS } from '../src/core/live-form.js';
 
 test('validateLive：日付があり出演者が1組以上なら ok', () => {
   assert.deepEqual(validateLive({ date: '2026-11-17', artists: [{ name: ' Aさん ' }] }), { ok: true, errors: {} });
@@ -167,4 +167,25 @@ test('copyFromPastVenue：見つからなければ何もしない', () => {
   assert.deepEqual(copyFromPastVenue(state, [], '会場A'), []);
   assert.deepEqual(copyFromPastVenue(state, [L('1', '2026-01-01', '会場A', { venue_address: 'x' })], '  '), []);
   assert.equal(state.venue_address, '');
+});
+
+test('sectionPatch：venue は3キーだけ取り出し、空白を除き、空は null', () => {
+  assert.deepEqual(
+    sectionPatch('venue', { venue_address: ' 東京 ', venue_station: '', access_memo: 'a', impression: 'x' }),
+    { venue_address: '東京', venue_station: null, access_memo: 'a' },
+  );
+});
+
+test('sectionPatch：train・impression も同様、足りないキーは null', () => {
+  assert.deepEqual(
+    sectionPatch('train', { last_train_memo: '  ', afterparty_memo: ' 乾杯 ', venue_address: 'x' }),
+    { last_train_memo: null, afterparty_memo: '乾杯' },
+  );
+  assert.deepEqual(sectionPatch('impression', { impression: ' よかった ', memo: 'm' }), { impression: 'よかった' });
+  assert.deepEqual(sectionPatch('impression', {}), { impression: null });
+});
+
+test('sectionPatch：知らない節名は例外', () => {
+  assert.throws(() => sectionPatch('nope', {}));
+  assert.deepEqual(Object.keys(SECTION_FIELDS), ['venue', 'train', 'impression']);
 });
