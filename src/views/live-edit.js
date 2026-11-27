@@ -1,6 +1,6 @@
 import { el, backLink, loadView, setChildren } from '../ui/dom.js';
-import { getLive, saveLive } from '../data/lives.js';
-import { validateLive, newArtist, deletableIds } from '../core/live-form.js';
+import { getLive, saveLive, listLives } from '../data/lives.js';
+import { validateLive, newArtist, deletableIds, venueSuggestions, copyFromPastVenue } from '../core/live-form.js';
 
 const SAVE_ERROR = '保存できませんでした。通信を確かめて、もう一度押してください';
 
@@ -14,6 +14,12 @@ function initialState(live) {
     venue: live?.venue ?? '',
     title: live?.title ?? '',
     memo: live?.memo ?? '',
+    venue_address: live?.venue_address ?? '',
+    venue_station: live?.venue_station ?? '',
+    access_memo: live?.access_memo ?? '',
+    last_train_memo: live?.last_train_memo ?? '',
+    afterparty_memo: live?.afterparty_memo ?? '',
+    impression: live?.impression ?? '',
     artists: [],
   };
   state.artists = live?.artists?.length
@@ -30,7 +36,18 @@ function toPayload(state) {
     if (a.id && a.original != null && a.name.trim() !== a.original.trim()) out.itunes_artist_id = null;
     return out;
   });
-  return { live: { id: state.id, date: state.date, venue: orNull(state.venue), title: orNull(state.title), memo: orNull(state.memo) }, artists };
+  return {
+    live: {
+      id: state.id, date: state.date, venue: orNull(state.venue), title: orNull(state.title), memo: orNull(state.memo),
+      venue_address: orNull(state.venue_address),
+      venue_station: orNull(state.venue_station),
+      access_memo: orNull(state.access_memo),
+      last_train_memo: orNull(state.last_train_memo),
+      afterparty_memo: orNull(state.afterparty_memo),
+      impression: orNull(state.impression),
+    },
+    artists,
+  };
 }
 
 // label の for と input の id でつなぐ（名前のない入力欄を作らない）。
@@ -80,14 +97,35 @@ function artistRow(state, index, rerender) {
   );
 }
 
-function buildForm(container, state, isNew, alive) {
+function textarea(state, key, rows = '3') {
+  const t = bind(el('textarea', { rows }), state, key);
+  t.value = state[key];
+  return t;
+}
+
+function buildForm(container, state, isNew, alive, pastLives = []) {
   let errors = {};
   let saveFailed = false;
   let saving = false;
 
   const draw = () => {
     const date = bind(el('input', { type: 'date', value: state.date, required: true }), state, 'date');
-    const venue = bind(el('input', { type: 'text', value: state.venue, autocomplete: 'off' }), state, 'venue');
+    const venue = bind(el('input', { type: 'text', value: state.venue, autocomplete: 'off', list: 'venue-options' }), state, 'venue');
+    const options = el('datalist', { id: 'venue-options' }, ...venueSuggestions(pastLives, state.id).map((v) => el('option', { value: v })));
+    const address = bind(el('input', { type: 'text', value: state.venue_address, autocomplete: 'off' }), state, 'venue_address');
+    const station = bind(el('input', { type: 'text', value: state.venue_station, autocomplete: 'off' }), state, 'venue_station');
+    const access = textarea(state, 'access_memo');
+    const lastTrain = textarea(state, 'last_train_memo');
+    const afterparty = textarea(state, 'afterparty_memo');
+    const impression = textarea(state, 'impression', '4');
+    const copyNote = el('p', { class: 'note', role: 'status', hidden: true });
+    const copyInputs = { venue_address: address, venue_station: station, access_memo: access, last_train_memo: lastTrain };
+    venue.addEventListener('change', () => {
+      const copied = copyFromPastVenue(state, pastLives, venue.value);
+      for (const key of copied) copyInputs[key].value = state[key];
+      copyNote.hidden = copied.length === 0;
+      copyNote.textContent = copied.length ? `前の${venue.value.trim()}のライブから写しました` : '';
+    });
     const title = bind(el('input', { type: 'text', value: state.title, autocomplete: 'off' }), state, 'title');
     const memo = bind(el('textarea', { rows: '4' }), state, 'memo');
     memo.value = state.memo;
@@ -107,9 +145,17 @@ function buildForm(container, state, isNew, alive) {
       { novalidate: true },
       field('日付', date, errors.date),
       field('会場', venue),
+      options,
+      copyNote,
+      field('住所', address),
+      field('会場の最寄り駅', station),
+      field('行き方のメモ', access),
       field('タイトル', title),
       field('メモ', memo),
       el('div', { class: 'field' }, el('span', { class: 'label', text: '出演者' }), list, errors.artists ? el('p', { class: 'note error', role: 'alert', text: errors.artists }) : null, add),
+      field('終電のメモ', lastTrain),
+      field('打ち上げ', afterparty),
+      field('感想', impression),
       saveFailed ? el('p', { class: 'note error', role: 'alert', text: SAVE_ERROR }) : null,
       el('div', { class: 'actions' }, save),
     );
@@ -155,14 +201,21 @@ function buildForm(container, state, isNew, alive) {
 export function renderLiveEdit(container, ctx) {
   const id = ctx.params.id;
   if (!id) {
-    buildForm(container, initialState(null), true, ctx.alive);
+    // 会場名の候補は、読めなくてもフォームは使える
+    listLives().then(
+      (lives) => ctx.alive() && buildForm(container, initialState(null), true, ctx.alive, lives),
+      () => ctx.alive() && buildForm(container, initialState(null), true, ctx.alive),
+    );
     return;
   }
-  loadView(container, ctx, () => getLive(id), (live) => {
+  loadView(container, ctx, async () => {
+    const [live, lives] = await Promise.all([getLive(id), listLives().catch(() => [])]);
+    return { live, lives };
+  }, ({ live, lives }) => {
     if (!live) {
       setChildren(container, backLink('#/lives', '一覧へ'), el('p', { class: 'note', text: 'このライブは見つかりませんでした' }));
       return;
     }
-    buildForm(container, initialState(live), false, ctx.alive);
+    buildForm(container, initialState(live), false, ctx.alive, lives);
   });
 }

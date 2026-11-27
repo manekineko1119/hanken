@@ -10,7 +10,7 @@ function check({ error }) {
 export async function listLives() {
   const { data, error } = await getClient()
     .from('lives')
-    .select('id, date, venue, title, memo, artists:live_artists(id, name, itunes_artist_id, position)')
+    .select('id, date, venue, title, memo, venue_address, venue_station, access_memo, last_train_memo, afterparty_memo, impression, artists:live_artists(id, name, itunes_artist_id, position)')
     .order('date', { ascending: true });
   if (error) throw error;
   for (const l of data) l.artists.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
@@ -20,7 +20,7 @@ export async function listLives() {
 export async function getLive(id) {
   const { data, error } = await getClient()
     .from('lives')
-    .select('id, date, venue, title, memo, artists:live_artists(id, name, itunes_artist_id, position)')
+    .select('id, date, venue, title, memo, venue_address, venue_station, access_memo, last_train_memo, afterparty_memo, impression, artists:live_artists(id, name, itunes_artist_id, position)')
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
@@ -33,7 +33,18 @@ export async function getLive(id) {
 // loadedIds：編集の画面を開いたときの出演者の id。消すのはこの中だけ（core/live-form.js の planArtistChanges）。
 export async function saveLive(live, artists, loadedIds = null) {
   const db = getClient();
-  const fields = { date: live.date, venue: live.venue ?? null, title: live.title ?? null, memo: live.memo ?? null };
+  const fields = {
+    date: live.date,
+    venue: live.venue ?? null,
+    title: live.title ?? null,
+    memo: live.memo ?? null,
+    venue_address: live.venue_address ?? null,
+    venue_station: live.venue_station ?? null,
+    access_memo: live.access_memo ?? null,
+    last_train_memo: live.last_train_memo ?? null,
+    afterparty_memo: live.afterparty_memo ?? null,
+    impression: live.impression ?? null,
+  };
   let id = live.id;
   if (id) {
     check(await db.from('lives').update(fields).eq('id', id));

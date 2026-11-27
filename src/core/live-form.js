@@ -54,3 +54,43 @@ export function deletableIds(state) {
   if (!state.loadedIds) return null;
   return [...state.loadedIds, ...(ownIds.get(state) ?? [])];
 }
+
+// 会場ごとに変わらない項目。前の同じ会場のライブから写す。
+export const VENUE_COPY_KEYS = ['venue_address', 'venue_station', 'access_memo', 'last_train_memo'];
+
+const blank = (v) => String(v ?? '').trim() === '';
+
+// 会場名の候補：空でない会場名を、新しい日付の順に重なりなしで返す（前後の空白は除いて比べる）。
+export function venueSuggestions(lives, excludeId = null) {
+  const sorted = (lives ?? [])
+    .filter((l) => !(excludeId != null && l.id === excludeId))
+    .sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')));
+  const seen = new Set();
+  const out = [];
+  for (const l of sorted) {
+    const v = String(l.venue ?? '').trim();
+    if (v && !seen.has(v)) {
+      seen.add(v);
+      out.push(v);
+    }
+  }
+  return out;
+}
+
+// 同じ会場名で日付が一番新しいライブ（自分自身は除く）から、state で空の欄だけ写す。写したキーを返す。
+export function copyFromPastVenue(state, lives, venue) {
+  const name = String(venue ?? '').trim();
+  if (!name) return [];
+  const source = (lives ?? [])
+    .filter((l) => l.id !== state.id && String(l.venue ?? '').trim() === name)
+    .sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')))[0];
+  if (!source) return [];
+  const copied = [];
+  for (const key of VENUE_COPY_KEYS) {
+    if (blank(state[key]) && !blank(source[key])) {
+      state[key] = source[key];
+      copied.push(key);
+    }
+  }
+  return copied;
+}

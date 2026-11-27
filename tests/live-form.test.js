@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateLive, planArtistChanges } from '../src/core/live-form.js';
+import { validateLive, planArtistChanges, venueSuggestions, copyFromPastVenue, VENUE_COPY_KEYS } from '../src/core/live-form.js';
 
 test('validateLive：日付があり出演者が1組以上なら ok', () => {
   assert.deepEqual(validateLive({ date: '2026-11-17', artists: [{ name: ' Aさん ' }] }), { ok: true, errors: {} });
@@ -121,4 +121,50 @@ test('deletableIds：開いたときの id ＋この画面で作った id。新�
   assert.notEqual(n1.id, n2.id);
   assert.deepEqual(deletableIds(state), ['a', n1.id, n2.id]);
   assert.equal(deletableIds({ loadedIds: null }), null);
+});
+
+const L = (id, date, venue, extra = {}) => ({ id, date, venue, ...extra });
+
+test('venueSuggestions：重なり・空・空白だけを除き、新しい日付の順に返す', () => {
+  const lives = [L('1', '2026-01-01', '会場A'), L('2', '2026-03-01', ' 会場B '), L('3', '2026-02-01', '会場A '), L('4', '2026-04-01', '  '), L('5', '2026-05-01', null)];
+  assert.deepEqual(venueSuggestions(lives), ['会場B', '会場A']);
+});
+
+test('venueSuggestions：excludeId のライブは数えない', () => {
+  const lives = [L('1', '2026-01-01', '会場A'), L('2', '2026-03-01', '会場B')];
+  assert.deepEqual(venueSuggestions(lives, '2'), ['会場A']);
+});
+
+test('VENUE_COPY_KEYS：写す4項目', () => {
+  assert.deepEqual(VENUE_COPY_KEYS, ['venue_address', 'venue_station', 'access_memo', 'last_train_memo']);
+});
+
+test('copyFromPastVenue：一番新しい同じ会場から、空の欄だけ写す', () => {
+  const lives = [
+    L('1', '2026-01-01', '会場A', { venue_address: '古い住所', venue_station: '古い駅' }),
+    L('2', '2026-03-01', ' 会場A ', { venue_address: '新しい住所', venue_station: '新しい駅', access_memo: '徒歩5分', last_train_memo: '' }),
+    L('3', '2026-05-01', '会場B', { venue_address: '別' }),
+  ];
+  const state = { id: 'x', venue_address: '', venue_station: '入力済み', access_memo: '  ', last_train_memo: '' };
+  const copied = copyFromPastVenue(state, lives, '会場A');
+  assert.deepEqual(copied, ['venue_address', 'access_memo']);
+  assert.equal(state.venue_address, '新しい住所');
+  assert.equal(state.venue_station, '入力済み');
+  assert.equal(state.access_memo, '徒歩5分');
+  assert.equal(state.last_train_memo, '');
+});
+
+test('copyFromPastVenue：自分自身（state.id）からは写さない', () => {
+  const lives = [L('1', '2026-01-01', '会場A', { venue_address: '住所1' }), L('2', '2026-03-01', '会場A', { venue_address: '自分' })];
+  const state = { id: '2', venue_address: '' };
+  assert.deepEqual(copyFromPastVenue(state, lives, '会場A'), ['venue_address']);
+  assert.equal(state.venue_address, '住所1');
+});
+
+test('copyFromPastVenue：見つからなければ何もしない', () => {
+  const state = { id: null, venue_address: '' };
+  assert.deepEqual(copyFromPastVenue(state, [L('1', '2026-01-01', '会場A', { venue_address: 'x' })], '会場Z'), []);
+  assert.deepEqual(copyFromPastVenue(state, [], '会場A'), []);
+  assert.deepEqual(copyFromPastVenue(state, [L('1', '2026-01-01', '会場A', { venue_address: 'x' })], '  '), []);
+  assert.equal(state.venue_address, '');
 });
