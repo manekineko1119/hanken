@@ -101,6 +101,9 @@ export async function setArtistItunesId(liveArtistId, itunesArtistId) {
 }
 
 // lives の1行を patch だけで更新する（upsert なし。出演者には触らない）。
-export async function updateLiveFields(id, patch) {
-  check(await getClient().from('lives').update(patch).eq('id', id));
+export async function updateLiveFields(id, patch, db = getClient()) {
+  const { data, error } = await db.from('lives').update(patch).eq('id', id).select('id');
+  if (error) throw error;
+  // 権限で止められた更新は、エラーにならず0行になる。成功と見せない。
+  if (!data || data.length === 0) throw new Error('更新できませんでした');
 }

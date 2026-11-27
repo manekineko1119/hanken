@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { photoPath, canAddPhoto, MAX_PHOTOS, MAX_PHOTO_BYTES, PHOTO_URL_SECONDS, PHOTO_MSG } from '../src/core/photos.js';
 import { listPhotos, addPhoto, deletePhoto, makePhotoBlob } from '../src/data/photos.js';
-import { deleteLive } from '../src/data/lives.js';
+import { deleteLive, updateLiveFields } from '../src/data/lives.js';
 
 test('定数と photoPath・canAddPhoto', () => {
   assert.equal(MAX_PHOTOS, 5);
@@ -108,4 +108,19 @@ test('deleteLive: 写真が0枚なら remove は呼ばず、ライブは消す',
   const c = fakeClient({ rows: [] });
   await deleteLive('l', c);
   assert.deepEqual(c.log, ['select live_photos live_id=l', 'delete lives id=l']);
+});
+
+function fakeUpdateDb(result) {
+  const calls = [];
+  const q = { update: (p) => { calls.push(['update', p]); return q; }, eq: (k, v) => { calls.push(['eq', k, v]); return q; }, select: (c) => { calls.push(['select', c]); return Promise.resolve(result); } };
+  return { calls, db: { from: (t) => { calls.push(['from', t]); return q; } } };
+}
+
+test('updateLiveFields: 1行返れば成功、0行（権限で止められた）・エラーは例外', async () => {
+  const ok = fakeUpdateDb({ data: [{ id: 'l' }], error: null });
+  await updateLiveFields('l', { impression: 'x' }, ok.db);
+  assert.deepEqual(ok.calls[0], ['from', 'lives']);
+  assert.deepEqual(ok.calls[1], ['update', { impression: 'x' }]);
+  await assert.rejects(updateLiveFields('l', {}, fakeUpdateDb({ data: [], error: null }).db));
+  await assert.rejects(updateLiveFields('l', {}, fakeUpdateDb({ data: null, error: new Error('x') }).db));
 });

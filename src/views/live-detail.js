@@ -88,7 +88,7 @@ const FIELD_DEFS = {
 };
 
 // 開いている節：入力欄と「保存」「キャンセル」。
-function editSection(key, live, { onSaved, onCancel, ctx }) {
+function editSection(key, live, { onSaved, onCancel, onSaving, ctx }) {
   const def = FIELD_DEFS[key];
   const inputs = {};
   const rows = def.fields.map(([k, label, kind]) => {
@@ -114,9 +114,11 @@ function editSection(key, live, { onSaved, onCancel, ctx }) {
     cancel.disabled = true;
     save.textContent = '保存中…';
     err.hidden = true;
+    onSaving(true);
     try {
       await updateLiveFields(live.id, patch);
     } catch {
+      onSaving(false);
       if (!ctx.alive()) return;
       save.disabled = false;
       cancel.disabled = false;
@@ -124,6 +126,7 @@ function editSection(key, live, { onSaved, onCancel, ctx }) {
       err.hidden = false;
       return;
     }
+    onSaving(false);
     if (!ctx.alive()) return;
     Object.assign(live, patch);
     onSaved();
@@ -158,10 +161,10 @@ function trainSection(live, home, edit) {
   if (st.url) {
     link = el('div', { class: 'live-record-links' }, extLink(st.url, '終電を調べる'));
   } else if (st.needVenueStation || st.needHome) {
-    const edit = st.needVenueStation ? el('a', { href: `#/live/${encodeURIComponent(live.id)}/edit`, text: '編集' }) : el('span', { text: '編集' });
+    const editLink = st.needVenueStation ? el('a', { href: `#/live/${encodeURIComponent(live.id)}/edit`, text: '編集' }) : el('span', { text: '編集' });
     const settings = st.needHome ? el('a', { href: '#/settings', text: '設定' }) : el('span', { text: '設定' });
     link = el('p', { class: 'note live-record-hint' },
-      el('span', { text: '会場の最寄り駅（' }), edit, el('span', { text: '）と自分の最寄り駅（' }), settings, el('span', { text: '）を入れると、終電を調べられます' }));
+      el('span', { text: '会場の最寄り駅（' }), editLink, el('span', { text: '）と自分の最寄り駅（' }), settings, el('span', { text: '）を入れると、終電を調べられます' }));
   }
   return section('終電・打ち上げ', [
     link,
@@ -197,11 +200,13 @@ export function renderLiveDetail(container, ctx) {
       // ③④⑤：開いている節は1つだけ。開く・保存・キャンセルで ③④⑤ をまとめて描き直す（終電のリンクは会場の駅を使うため）。
       const records = el('div', { class: 'live-records' });
       let openKey = null;
+      let saving = false;
       const drawRecords = (focusKey = null) => {
-        const open = (key) => { openKey = key; drawRecords(); records.querySelector('textarea, input')?.focus(); };
-        const close = (key) => { openKey = null; drawRecords(key); };
+        const open = (key) => { if (saving) return; openKey = key; drawRecords(); records.querySelector('textarea, input')?.focus(); };
+        const close = (key) => { if (openKey !== key) return; openKey = null; drawRecords(key); };
+        const onSaving = (v) => { saving = v; for (const b of records.querySelectorAll('.live-record-edit')) b.disabled = v; };
         const part = (key, build) => (openKey === key
-          ? editSection(key, live, { ctx, onSaved: () => close(key), onCancel: () => close(key) })
+          ? editSection(key, live, { ctx, onSaving, onSaved: () => close(key), onCancel: () => close(key) })
           : build({ key, open }));
         setChildren(records,
           part('venue', (edit) => venueSection(live, edit)),
