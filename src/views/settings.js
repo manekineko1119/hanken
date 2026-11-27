@@ -1,6 +1,7 @@
 import { el, setChildren, loadView } from '../ui/dom.js';
 import { signOut } from '../auth/auth.js';
 import { getStatus, connect, disconnect, finishConnect } from '../data/youtube.js';
+import { stationFieldState } from '../core/settings.js';
 import { getHomeStation, saveHomeStation } from '../data/settings.js';
 import { daysLeft, pendingIdOf, finishErrorText } from '../core/youtube.js';
 
@@ -35,7 +36,7 @@ export function renderSettings(container, ctx) {
     })();
     return;
   }
-  loadView(view, ctx, async () => ({ status: await getStatus(), home: await getHomeStation().catch(() => null) }), ({ status, home }) => {
+  loadView(view, ctx, async () => ({ status: await getStatus(), home: await getHomeStation().catch(() => undefined) }), ({ status, home }) => {
     const msg = el('p', { class: 'note error', role: 'alert', hidden: true });
     const notice = ctx.finishError ?? NOTICES[ctx.query?.yt];
     if (notice) showError(msg, notice);
@@ -71,7 +72,8 @@ export function renderSettings(container, ctx) {
     }
 
     const stationInput = el('input', { type: 'text', id: 'home-station', placeholder: '例：○○駅', autocomplete: 'off' });
-    stationInput.value = home ?? '';
+    const stationState = stationFieldState(home);
+    stationInput.value = stationState.value;
     const stationMsg = el('p', { class: 'note', role: 'status', hidden: true });
     const stationSave = el('button', { type: 'button', text: '保存' });
     stationSave.addEventListener('click', async () => {
@@ -93,11 +95,15 @@ export function renderSettings(container, ctx) {
     });
     const station = el('section', { class: 'settings-section' },
       el('h2', { text: '最寄り駅' }),
-      el('label', { for: 'home-station', text: '自分の最寄り駅' }),
-      stationInput,
-      el('p', { class: 'note', text: '終電を調べるときに、帰りの駅として使います' }),
-      el('div', { class: 'settings-actions' }, stationSave),
-      stationMsg);
+      ...(stationState.editable ? [
+        el('label', { for: 'home-station', text: '自分の最寄り駅' }),
+        stationInput,
+        el('p', { class: 'note', text: '終電を調べるときに、帰りの駅として使います' }),
+        el('div', { class: 'settings-actions' }, stationSave),
+        stationMsg,
+      ] : [
+        el('p', { class: 'note error', role: 'alert', text: '最寄り駅を読み込めませんでした。開き直してください' }),
+      ]));
 
     const out = el('button', { type: 'button', text: 'ログアウト' });
     out.addEventListener('click', async () => {

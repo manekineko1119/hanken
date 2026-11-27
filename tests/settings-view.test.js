@@ -39,3 +39,10 @@ test('cleanHomeStation：空・空白だけ・文字列以外は null', async ()
   const { cleanHomeStation } = await import('../src/core/settings.js');
   for (const v of ['', '   ', '　 　', null, undefined, 5]) assert.equal(cleanHomeStation(v), null);
 });
+
+test('stationFieldState：読み込み失敗（undefined）では欄を出さない。未設定（null）・設定済みは出す', async () => {
+  const { stationFieldState } = await import('../src/core/settings.js');
+  assert.deepEqual(stationFieldState(undefined), { editable: false, value: '' });
+  assert.deepEqual(stationFieldState(null), { editable: true, value: '' });
+  assert.deepEqual(stationFieldState('渋谷駅'), { editable: true, value: '渋谷駅' });
+});
