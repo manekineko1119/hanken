@@ -1,5 +1,5 @@
 begin;
-select plan(16);
+select plan(21);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000a1', 'a@example.test'),
@@ -53,13 +53,30 @@ select throws_ok(
      '00000000-0000-0000-0000-0000000000a1/11111111-0000-0000-0000-000000000002/bbbbbbbb-0000-0000-0000-000000000006.jpg', 6)$$,
   'P0001', 'PHOTO_LIMIT', '5 枚あるライブに 6 枚目は PHOTO_LIMIT');
 select throws_ok(
-  $$insert into public.live_photos (live_id, storage_path) values
-    ('11111111-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000a1/11111111-0000-0000-0000-0000000000b1/x.jpg')$$,
+  $$insert into public.live_photos (id, live_id, storage_path) values
+    ('dddddddd-0000-0000-0000-000000000001', '11111111-0000-0000-0000-0000000000b1',
+     '00000000-0000-0000-0000-0000000000a1/11111111-0000-0000-0000-0000000000b1/dddddddd-0000-0000-0000-000000000001.jpg')$$,
   '42501', null, 'ほかの人のライブには写真を足せない');
+
+-- ---------- storage.objects（A として）----------
+select throws_ok(
+  $$insert into storage.objects (bucket_id, name, owner_id) values
+    ('live-photos', '00000000-0000-0000-0000-0000000000a1/11111111-0000-0000-0000-000000000001/eeeeeeee-0000-0000-0000-000000000001.jpg', '00000000-0000-0000-0000-0000000000a1')$$,
+  '42501', null, '行のないパスには写真の実体を置けない');
+select lives_ok(
+  $$insert into storage.objects (bucket_id, name, owner_id) values
+    ('live-photos', '00000000-0000-0000-0000-0000000000a1/11111111-0000-0000-0000-000000000001/aaaaaaaa-0000-0000-0000-000000000005.jpg', '00000000-0000-0000-0000-0000000000a1')$$,
+  '本人の live_photos の行があるパスには置ける');
+select throws_ok(
+  $$insert into storage.objects (bucket_id, name, owner_id) values
+    ('live-photos', '00000000-0000-0000-0000-0000000000b1/11111111-0000-0000-0000-0000000000b1/x.jpg', '00000000-0000-0000-0000-0000000000a1')$$,
+  '42501', null, 'ほかの人のフォルダには置けない');
+select is((select count(*)::int from storage.objects where bucket_id = 'live-photos'), 1, 'A は自分の写真の実体を読める');
 
 -- ---------- B として ----------
 select set_config('request.jwt.claims', json_build_object('sub', '00000000-0000-0000-0000-0000000000b1', 'email', 'b@example.test', 'role', 'authenticated')::text, true);
 select is((select count(*)::int from public.live_photos), 0, 'B は A の写真を読めない');
+select is((select count(*)::int from storage.objects where bucket_id = 'live-photos'), 0, 'B は A の写真の実体を読めない');
 select is((select home_station from public.user_settings), 'B station', 'B は自分の設定だけ読める');
 
 -- ---------- anon ----------

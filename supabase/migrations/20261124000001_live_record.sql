@@ -96,6 +96,6 @@ create policy live_photos_objects_insert on storage.objects for insert to authen
     and (select private.is_allowed())
     and exists (
       select 1 from public.live_photos p
-      where p.storage_path = name and p.user_id = (select auth.uid())
+      where p.storage_path = objects.name and p.user_id = (select auth.uid())
     )
   );
