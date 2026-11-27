@@ -52,8 +52,8 @@ export async function listPhotos(liveId, deps = {}) {
   const out = [];
   for (const row of data) {
     const { data: signed, error: e } = await db.storage.from(BUCKET).createSignedUrl(row.storage_path, PHOTO_URL_SECONDS);
-    if (e || !signed?.signedUrl) continue; // URL が作れない行は除く
-    out.push({ id: row.id, url: signed.signedUrl, storage_path: row.storage_path });
+    // URL が作れない行（ファイルがない）も返す（url: null）。5枚の数え方は行の数で、画面で消せるようにするため
+    out.push({ id: row.id, url: e || !signed?.signedUrl ? null : signed.signedUrl, storage_path: row.storage_path });
   }
   return out;
 }
@@ -80,7 +80,7 @@ export async function addPhoto(liveId, file, deps = {}) {
     throw new Error(PHOTO_MSG.failed);
   }
   const { data: signed, error: sErr } = await db.storage.from(BUCKET).createSignedUrl(path, PHOTO_URL_SECONDS);
-  if (sErr || !signed?.signedUrl) return { id, url: '', storage_path: path };
+  if (sErr || !signed?.signedUrl) return { id, url: null, storage_path: path };
   return { id, url: signed.signedUrl, storage_path: path };
 }
 

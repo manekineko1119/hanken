@@ -6,7 +6,7 @@ import { runStart } from './prep-flow.js';
 import { renderLivePhotos } from './live-photos.js';
 
 const STATUS_LABEL = { none: '未作成', draft: '下書き', saved: '保存済み' };
-const DELETE_CONFIRM = 'このライブを消しますか？アプリの中の予習の記録も消えます。YouTube 上のプレイリストは消えません。';
+const DELETE_CONFIRM = 'このライブを消しますか？アプリの中の予習の記録と、写真も消えます。YouTube 上のプレイリストは消えません。';
 
 // null・undefined・空白だけは空にする（「null」を画面に出さない）。
 function text(v) {

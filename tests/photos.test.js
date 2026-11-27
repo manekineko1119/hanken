@@ -15,7 +15,7 @@ test('定数と photoPath・canAddPhoto', () => {
 
 // 呼び出しの順番を log に残す、小さな偽クライアント。
 function fakeClient({ rows = [], insertError = null, uploadError = null, removeError = null, badPaths = [], log = [] } = {}) {
-  return {
+  const client = {
     log,
     from(table) {
       const q = { table };
@@ -35,21 +35,26 @@ function fakeClient({ rows = [], insertError = null, uploadError = null, removeE
     storage: {
       from: () => ({
         createSignedUrl: async (p, sec) => (badPaths.includes(p) ? { data: null, error: new Error('x') } : { data: { signedUrl: `https://s/${p}?t=${sec}` }, error: null }),
-        upload: async (p, blob, opt) => { log.push(`upload ${p} ${opt.contentType} upsert=${opt.upsert}`); return { error: uploadError }; },
+        upload: async (p, blob, opt) => { client.uploaded = blob; log.push(`upload ${p} ${opt.contentType} upsert=${opt.upsert}`); return { error: uploadError }; },
         remove: async (paths) => { log.push(`remove ${paths.join(',')}`); return { error: removeError }; },
       }),
     },
   };
+  return client;
 }
 
-test('listPhotos: 期限付きの URL が作れない行は除く', async () => {
+test('listPhotos: URL が作れない行は url: null で残す（5枚の数に入るため）', async () => {
   const rows = [{ id: 'a', storage_path: 'u/l/a.jpg' }, { id: 'b', storage_path: 'u/l/b.jpg' }];
   const client = fakeClient({ rows, badPaths: ['u/l/b.jpg'] });
   const r = await listPhotos('l', { client });
-  assert.deepEqual(r, [{ id: 'a', url: 'https://s/u/l/a.jpg?t=3600', storage_path: 'u/l/a.jpg' }]);
+  assert.deepEqual(r, [
+    { id: 'a', url: 'https://s/u/l/a.jpg?t=3600', storage_path: 'u/l/a.jpg' },
+    { id: 'b', url: null, storage_path: 'u/l/b.jpg' },
+  ]);
 });
 
-const okShrink = async () => ({ size: 100 });
+const shrunk = { size: 100, shrunk: true };
+const okShrink = async () => shrunk;
 const deps = (client, extra = {}) => ({ client, userId: 'u', newId: () => 'p1', shrink: okShrink, ...extra });
 
 test('addPhoto: 行を入れてからファイルを置く', async () => {
@@ -57,6 +62,7 @@ test('addPhoto: 行を入れてからファイルを置く', async () => {
   const r = await addPhoto('l', {}, deps(client));
   assert.equal(r.id, 'p1');
   assert.deepEqual(client.log, ['insert live_photos u/l/p1.jpg', 'upload u/l/p1.jpg image/jpeg upsert=false']);
+  assert.equal(client.uploaded, shrunk); // 元の File ではなく、縮めた Blob を置く
 });
 
 test('addPhoto: upload が失敗したら行を消してエラー', async () => {
@@ -96,4 +102,10 @@ test('deleteLive: 先にファイルを消してからライブを消す。消�
   const ng = fakeClient({ rows, removeError: new Error('x') });
   await assert.rejects(deleteLive('l', ng));
   assert.ok(!ng.log.some((s) => s.startsWith('delete lives')));
+});
+
+test('deleteLive: 写真が0枚なら remove は呼ばず、ライブは消す', async () => {
+  const c = fakeClient({ rows: [] });
+  await deleteLive('l', c);
+  assert.deepEqual(c.log, ['select live_photos live_id=l', 'delete lives id=l']);
 });
