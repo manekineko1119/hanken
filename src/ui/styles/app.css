@@ -600,7 +600,10 @@ button.link:not(:disabled):hover { color: var(--ink); }
 .paste-box summary { cursor: pointer; color: var(--accent); min-height: 44px; display: flex; align-items: center; }
 .paste-box .actions { margin-top: var(--s3); }
 .note.small { font-size: 12px; margin-top: var(--s6); }
-.setlist-line { flex: 0 0 100%; display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+/* セトリの行：予習と同じく、状態の文字をボタンのすぐ左に置く。文字の幅をそろえて、予習とセトリの文字の左端を縦に揃える */
+.setlist-line { flex: 0 0 100%; display: flex; align-items: center; justify-content: flex-end; gap: var(--s2); }
+.live-artist > .status, .setlist-line > .status { flex: none; width: 8.5em; }
+.live-artist > .button, .live-artist > button, .setlist-line > .button { flex: none; width: 64px; justify-content: center; }
 /* 曲名：下に点線。押すと直せる。要確認の曲には真鍮の小さな札（左の棒や影は付けない） */
 button.song-title {
   display: inline-flex; align-items: center; max-width: 100%; min-height: 44px; min-width: 0; padding: 0; border: 0; background: transparent;

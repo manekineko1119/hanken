@@ -32,7 +32,7 @@ function artistRow(artist, index, { live, statuses, prepIds, setlistIds, ctx, ms
     : `#/live/${encodeURIComponent(live.id)}/setlist/${encodeURIComponent(artist.id)}`;
   return el(
     'li',
-    { class: 'artist-row' },
+    { class: 'artist-row live-artist' },
     el('span', { class: 'artist-name', text: `${index + 1}. ${artist.name}` }),
     el('span', { class: `status status-${prep}`, text: `予習：${STATUS_LABEL[prep]}` }),
     action,
