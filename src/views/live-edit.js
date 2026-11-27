@@ -103,7 +103,9 @@ function textarea(state, key, rows = '3') {
   return t;
 }
 
-function buildForm(container, state, isNew, alive, pastLives = []) {
+function buildForm(container, state, isNew, alive, initialLives = []) {
+  let pastLives = initialLives;
+  let copyText = ''; // 「写しました」の表示。draw し直しても残す
   let errors = {};
   let saveFailed = false;
   let saving = false;
@@ -118,13 +120,14 @@ function buildForm(container, state, isNew, alive, pastLives = []) {
     const lastTrain = textarea(state, 'last_train_memo');
     const afterparty = textarea(state, 'afterparty_memo');
     const impression = textarea(state, 'impression', '4');
-    const copyNote = el('p', { class: 'note', role: 'status', hidden: true });
+    const copyNote = el('p', { class: 'note', role: 'status', hidden: !copyText, text: copyText });
     const copyInputs = { venue_address: address, venue_station: station, access_memo: access, last_train_memo: lastTrain };
     venue.addEventListener('change', () => {
       const copied = copyFromPastVenue(state, pastLives, venue.value);
       for (const key of copied) copyInputs[key].value = state[key];
-      copyNote.hidden = copied.length === 0;
-      copyNote.textContent = copied.length ? `前の${venue.value.trim()}のライブから写しました` : '';
+      copyText = copied.length ? `前の${venue.value.trim()}のライブから写しました` : '';
+      copyNote.hidden = !copyText;
+      copyNote.textContent = copyText;
     });
     const title = bind(el('input', { type: 'text', value: state.title, autocomplete: 'off' }), state, 'title');
     const memo = bind(el('textarea', { rows: '4' }), state, 'memo');
@@ -196,16 +199,22 @@ function buildForm(container, state, isNew, alive, pastLives = []) {
   }
 
   draw();
+  // 会場名の候補があとから届いたとき、いまの datalist だけ入れ替える（入力中の欄に触らない）
+  return {
+    setPastLives(lives) {
+      pastLives = lives;
+      const dl = container.querySelector('#venue-options');
+      if (dl) dl.replaceChildren(...venueSuggestions(pastLives, state.id).map((v) => el('option', { value: v })));
+    },
+  };
 }
 
 export function renderLiveEdit(container, ctx) {
   const id = ctx.params.id;
   if (!id) {
-    // 会場名の候補は、読めなくてもフォームは使える
-    listLives().then(
-      (lives) => ctx.alive() && buildForm(container, initialState(null), true, ctx.alive, lives),
-      () => ctx.alive() && buildForm(container, initialState(null), true, ctx.alive),
-    );
+    // フォームはすぐ出す。会場名の候補は届いたら足す（読めなくてもフォームは使える）
+    const form = buildForm(container, initialState(null), true, ctx.alive);
+    listLives().then((lives) => ctx.alive() && form.setPastLives(lives), () => {});
     return;
   }
   loadView(container, ctx, async () => {
