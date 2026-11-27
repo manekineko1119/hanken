@@ -618,6 +618,14 @@ button.song-title {
 .song-rename-actions { display: flex; gap: var(--s2); width: 100%; margin-bottom: var(--s2); }
 .song-rename-actions button { min-height: 36px; padding: 0 var(--s3); font-size: 14px; }
 
+/* ライブの詳細の「会場」「終電・打ち上げ」「感想」の節（live-detail 専用。ほかの画面に効かせない） */
+.live-record { margin-top: var(--s6); }
+.live-record-text { margin: 0 0 var(--s2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.live-record-label { margin: 0 0 var(--s1); color: var(--muted); font-size: 13px; }
+.live-record-block { margin-top: var(--s3); }
+.live-record-links { display: flex; flex-wrap: wrap; gap: var(--s2); margin: var(--s3) 0; }
+.live-record-hint a { text-decoration: underline; }
+
 /* ライブの詳細の「写真」の節（live-photos 専用。ほかの画面に効かせない） */
 .live-photos { margin-top: var(--s6); }
 .live-photos-grid { list-style: none; margin: 0 0 var(--s3); padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--s2); }

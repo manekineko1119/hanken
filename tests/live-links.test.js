@@ -68,3 +68,18 @@ test('directionsUrl・nearbyUrl: 会場名も住所も空なら null', () => {
   assert.equal(nearbyUrl({ venue: '', venue_address: null }), null);
   assert.equal(nearbyUrl({}), null);
 });
+
+import { lastTrainState } from '../src/core/live-links.js';
+
+test('lastTrainState: 出し分け', () => {
+  const base = { date: '2026-11-20' };
+  const a = lastTrainState({ ...base, venue_station: '' }, null);
+  assert.deepEqual([a.url, a.needVenueStation, a.needHome], [null, true, true]);
+  const b = lastTrainState({ ...base, venue_station: '渋谷駅' }, '');
+  assert.deepEqual([b.url, b.needVenueStation, b.needHome], [null, false, true]);
+  const c = lastTrainState({ ...base, venue_station: null }, '新宿');
+  assert.deepEqual([c.url, c.needVenueStation, c.needHome], [null, true, false]);
+  const d = lastTrainState({ ...base, venue_station: '渋谷駅' }, '新宿');
+  assert.ok(d.url.startsWith('https://transit.yahoo.co.jp/'));
+  assert.deepEqual([d.needVenueStation, d.needHome], [false, false]);
+});

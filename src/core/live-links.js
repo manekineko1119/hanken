@@ -41,3 +41,14 @@ export function lastTrainUrl(live, homeStation) {
   const [, y, mo, d] = m;
   return `https://transit.yahoo.co.jp/search/result?from=${enc(from)}&to=${enc(to)}&y=${y}&m=${mo}&d=${d}&hh=12&m1=0&m2=0&type=2`;
 }
+
+// ［終電を調べる］の出し分け。url があればリンク、なければ足りない入れ場所を返す。
+// needVenueStation → 編集の画面、needHome → 設定の画面へのリンクを出す。
+// 日付だけ不正で url が null のときは、駅は足りているのでどちらも false。
+export function lastTrainState(live, homeStation) {
+  return {
+    url: lastTrainUrl(live, homeStation),
+    needVenueStation: !normalizeStation(live?.venue_station),
+    needHome: !normalizeStation(homeStation),
+  };
+}

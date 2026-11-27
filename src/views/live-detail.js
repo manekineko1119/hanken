@@ -4,6 +4,8 @@ import { formatDateJa, liveHeading } from '../core/lives.js';
 import { getPrepIds, getSetlistIds } from '../data/playlists.js';
 import { runStart } from './prep-flow.js';
 import { renderLivePhotos } from './live-photos.js';
+import { getHomeStation } from '../data/settings.js';
+import { directionsUrl, nearbyUrl, lastTrainState } from '../core/live-links.js';
 
 const STATUS_LABEL = { none: '未作成', draft: '下書き', saved: '保存済み' };
 const DELETE_CONFIRM = 'このライブを消しますか？アプリの中の予習の記録と、写真も消えます。YouTube 上のプレイリストは消えません。';
@@ -60,16 +62,74 @@ async function onDelete(live, container, button, ctx) {
   }
 }
 
+const EMPTY = 'まだありません';
+
+function extLink(href, label) {
+  return el('a', { class: 'button', href, target: '_blank', rel: 'noopener', text: label });
+}
+
+function section(title, children) {
+  const body = children.filter(Boolean);
+  return el('section', { class: 'live-record' }, el('h2', { text: title }),
+    ...(body.length ? body : [el('p', { class: 'note', text: EMPTY })]));
+}
+
+function memoP(label, value) {
+  const v = text(value);
+  if (!v) return null;
+  return el('div', { class: 'live-record-block' },
+    label ? el('p', { class: 'live-record-label', text: label }) : null,
+    el('p', { class: 'live-record-text', text: v }));
+}
+
+function venueSection(live) {
+  const dir = directionsUrl(live);
+  const near = nearbyUrl(live);
+  const station = text(live.venue_station);
+  return section('会場', [
+    text(live.venue) ? el('p', { class: 'live-record-text', text: text(live.venue) }) : null,
+    text(live.venue_address) ? el('p', { class: 'live-record-text', text: text(live.venue_address) }) : null,
+    station ? el('p', { class: 'live-record-text', text: `最寄り駅：${station}` }) : null,
+    dir || near ? el('div', { class: 'live-record-links' }, dir ? extLink(dir, '行き方') : null, near ? extLink(near, '周りの店') : null) : null,
+    memoP('行き方のメモ', live.access_memo),
+  ]);
+}
+
+function trainSection(live, home) {
+  const st = lastTrainState(live, home);
+  let link;
+  if (st.url) {
+    link = el('div', { class: 'live-record-links' }, extLink(st.url, '終電を調べる'));
+  } else if (st.needVenueStation || st.needHome) {
+    const edit = st.needVenueStation ? el('a', { href: `#/live/${encodeURIComponent(live.id)}/edit`, text: '編集' }) : el('span', { text: '編集' });
+    const settings = st.needHome ? el('a', { href: '#/settings', text: '設定' }) : el('span', { text: '設定' });
+    link = el('p', { class: 'note live-record-hint' },
+      el('span', { text: '会場の最寄り駅（' }), edit, el('span', { text: '）と自分の最寄り駅（' }), settings, el('span', { text: '）を入れると、終電を調べられます' }));
+  }
+  return section('終電・打ち上げ', [
+    link,
+    memoP('終電のメモ', live.last_train_memo),
+    memoP('打ち上げ', live.afterparty_memo),
+  ]);
+}
+
+function impressionSection(live) {
+  return section('感想', [memoP(null, live.impression)]);
+}
+
 export function renderLiveDetail(container, ctx) {
   const id = ctx.params.id;
   loadView(
     container,
     ctx,
     async () => {
-      const [live, statuses, prepIds, setlistIds] = await Promise.all([getLive(id), getPlaylistStatuses(id), getPrepIds(id), getSetlistIds(id)]);
-      return { live, statuses, prepIds, setlistIds };
+      // 自分の最寄り駅が読めなくても画面は出す（終電のところでヒントを出す）。
+      const [live, statuses, prepIds, setlistIds, home] = await Promise.all([
+        getLive(id), getPlaylistStatuses(id), getPrepIds(id), getSetlistIds(id), getHomeStation().catch(() => null),
+      ]);
+      return { live, statuses, prepIds, setlistIds, home };
     },
-    ({ live, statuses, prepIds, setlistIds }) => {
+    ({ live, statuses, prepIds, setlistIds, home }) => {
       if (!live) {
         setChildren(container, backLink('#/lives', '一覧へ'), el('p', { class: 'note', text: 'このライブは見つかりませんでした' }));
         return;
@@ -85,8 +145,11 @@ export function renderLiveDetail(container, ctx) {
         el('h2', { text: '出演者' }),
         el('ul', { class: 'list on-paper' }, ...live.artists.map((a, i) => artistRow(a, i, { live, statuses, prepIds, setlistIds, ctx, msg }))),
         msg,
-        el('div', { class: 'actions' }, el('a', { class: 'button', href: `#/live/${encodeURIComponent(live.id)}/edit`, text: '編集' }), del),
+        venueSection(live),
+        trainSection(live, home),
+        impressionSection(live),
         renderLivePhotos(live.id, ctx),
+        el('div', { class: 'actions' }, el('a', { class: 'button', href: `#/live/${encodeURIComponent(live.id)}/edit`, text: '編集' }), del),
       );
     },
   );

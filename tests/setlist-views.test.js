@@ -46,6 +46,7 @@ globalThis.fetch = async (input, init) => {
     case '/rest/v1/playlists': return Response.json(playlists);
     case '/rest/v1/lives': return Response.json([live]);
     case '/rest/v1/playlist_tracks': return Response.json(tracks);
+    case '/rest/v1/user_settings': return Response.json(null);
     case '/rest/v1/rpc/replace_playlist_tracks': saved = JSON.parse(init.body).p_tracks; return new Response(null, { status: 204 });
     default: throw new Error(`Unexpected request: ${url.pathname}`);
   }
