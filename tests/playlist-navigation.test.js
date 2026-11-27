@@ -67,6 +67,8 @@ globalThis.fetch = async (input, init) => {
       return init?.method === 'PATCH' ? new Response(null, { status: 204 }) : Response.json([artist]);
     case '/rest/v1/playlist_tracks':
       return Response.json([track]);
+    case '/rest/v1/user_settings':
+      return Response.json([]);
     case '/rest/v1/rpc/am_i_allowed':
       return Response.json(true);
     case '/rest/v1/rpc/youtube_connection_status':

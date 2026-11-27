@@ -26,3 +26,16 @@ test('finishErrorText：ほかのアカウント・時間切れ・そのほか',
   assert.match(finishErrorText('EXPIRED'), /時間が切れ/);
   assert.match(finishErrorText(undefined), /つなげませんでした/);
 });
+
+test('cleanHomeStation：前後の空白（全角も）を取る。「駅」は触らない', async () => {
+  const { cleanHomeStation } = await import('../src/core/settings.js');
+  assert.equal(cleanHomeStation('  渋谷駅 '), '渋谷駅');
+  assert.equal(cleanHomeStation('　新宿　'), '新宿');
+  assert.equal(cleanHomeStation('池袋'), '池袋');
+  assert.equal(cleanHomeStation('大 宮'), '大 宮');
+});
+
+test('cleanHomeStation：空・空白だけ・文字列以外は null', async () => {
+  const { cleanHomeStation } = await import('../src/core/settings.js');
+  for (const v of ['', '   ', '　 　', null, undefined, 5]) assert.equal(cleanHomeStation(v), null);
+});
