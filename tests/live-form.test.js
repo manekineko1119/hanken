@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateLive, planArtistChanges, venueSuggestions, copyFromPastVenue, VENUE_COPY_KEYS, sectionPatch, SECTION_FIELDS } from '../src/core/live-form.js';
+import { validateLive, planArtistChanges, venueSuggestions, copyFromPastVenue, VENUE_COPY_KEYS, sectionPatch, SECTION_FIELDS, changedLiveFields, isSectionDirty } from '../src/core/live-form.js';
 
 test('validateLive：日付があり出演者が1組以上なら ok', () => {
   assert.deepEqual(validateLive({ date: '2026-11-17', artists: [{ name: ' Aさん ' }] }), { ok: true, errors: {} });
@@ -188,4 +188,31 @@ test('sectionPatch：train・impression も同様、足りないキーは null',
 test('sectionPatch：知らない節名は例外', () => {
   assert.throws(() => sectionPatch('nope', {}));
   assert.deepEqual(Object.keys(SECTION_FIELDS), ['venue', 'train', 'impression']);
+});
+
+test('changedLiveFields：変えていない欄は含めない', () => {
+  const loaded = { date: '2026-11-17', title: 'A', impression: '良かった', memo: null };
+  assert.deepEqual(changedLiveFields(loaded, { ...loaded, title: 'B' }), { title: 'B' });
+  assert.deepEqual(changedLiveFields(loaded, { ...loaded }), {});
+});
+
+test('changedLiveFields：空にしたら null、null と空文字・空白は同じ', () => {
+  const loaded = { date: '2026-11-17', title: 'A', memo: null, venue: '', impression: '  x ' };
+  const next = { date: '2026-11-17', title: '  ', memo: '', venue: null, impression: 'x' };
+  assert.deepEqual(changedLiveFields(loaded, next), { title: null });
+});
+
+test('changedLiveFields：対象外のキーは無視する', () => {
+  assert.deepEqual(changedLiveFields({ id: 1 }, { id: 2, artists: [] }), {});
+});
+
+test('isSectionDirty：入力が保存済みの値と同じなら false（空白・null は同じ扱い）', () => {
+  const live = { venue_address: '東京', venue_station: null, access_memo: '' };
+  assert.equal(isSectionDirty('venue', live, { venue_address: ' 東京 ', venue_station: '', access_memo: '' }), false);
+});
+
+test('isSectionDirty：1つでも違えば true', () => {
+  const live = { impression: '良かった' };
+  assert.equal(isSectionDirty('impression', live, { impression: '良かった！' }), true);
+  assert.equal(isSectionDirty('impression', live, { impression: '' }), true);
 });

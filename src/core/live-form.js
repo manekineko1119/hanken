@@ -113,3 +113,26 @@ export function sectionPatch(section, values) {
   }
   return patch;
 }
+
+// 編集の画面を開いたときの値と比べて、変えた lives の欄だけを返す（値は前後の空白を除き、空は null）。
+// 別の画面で直した欄を、古い値で上書きしないため。
+export const LIVE_FIELD_KEYS = ['date', 'venue', 'title', 'memo', 'venue_address', 'venue_station', 'access_memo', 'last_train_memo', 'afterparty_memo', 'impression'];
+export function changedLiveFields(loaded, next) {
+  const norm = (v) => {
+    const t = String(v ?? '').trim();
+    return t === '' ? null : t;
+  };
+  const out = {};
+  for (const k of LIVE_FIELD_KEYS) {
+    const n = norm(next?.[k]);
+    if (norm(loaded?.[k]) !== n) out[k] = n;
+  }
+  return out;
+}
+
+// 詳細の画面で開いている節の入力が、保存済みの値と違うか。
+export function isSectionDirty(section, live, values) {
+  const now = sectionPatch(section, values);
+  const saved = sectionPatch(section, live);
+  return Object.keys(now).some((k) => now[k] !== saved[k]);
+}

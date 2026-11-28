@@ -5,7 +5,7 @@ import { getPrepIds, getSetlistIds } from '../data/playlists.js';
 import { runStart } from './prep-flow.js';
 import { renderLivePhotos } from './live-photos.js';
 import { getHomeStation } from '../data/settings.js';
-import { sectionPatch } from '../core/live-form.js';
+import { sectionPatch, isSectionDirty } from '../core/live-form.js';
 import { directionsUrl, nearbyUrl, lastTrainState } from '../core/live-links.js';
 
 const STATUS_LABEL = { none: '未作成', draft: '下書き', saved: '保存済み' };
@@ -80,6 +80,7 @@ function section(title, children, edit) {
 }
 
 const SAVE_ERROR = '保存できませんでした。通信を確かめて、もう一度押してください';
+const DISCARD_CONFIRM = '入力中の内容は消えます。よろしいですか？';
 // 節ごとの入力欄（ラベルは編集の画面と同じ）。
 const FIELD_DEFS = {
   venue: { title: '会場', fields: [['venue_address', '住所', 'input'], ['venue_station', '会場の最寄り駅', 'input'], ['access_memo', '行き方のメモ', 'textarea']] },
@@ -88,7 +89,7 @@ const FIELD_DEFS = {
 };
 
 // 開いている節：入力欄と「保存」「キャンセル」。
-function editSection(key, live, { onSaved, onCancel, onSaving, ctx }) {
+function editSection(key, live, { onSaved, onCancel, onSaving, ctx, register }) {
   const def = FIELD_DEFS[key];
   const inputs = {};
   const rows = def.fields.map(([k, label, kind]) => {
@@ -100,6 +101,7 @@ function editSection(key, live, { onSaved, onCancel, onSaving, ctx }) {
     inputs[k] = input;
     return el('div', { class: 'field' }, el('label', { for: id, class: 'label', text: label }), input);
   });
+  register?.(() => isSectionDirty(key, live, Object.fromEntries(Object.entries(inputs).map(([k, i]) => [k, i.value]))));
   const save = el('button', { type: 'submit', class: 'primary', text: '保存' });
   const cancel = el('button', { type: 'button', text: 'キャンセル' });
   const err = el('p', { class: 'note error', role: 'alert', hidden: true, text: SAVE_ERROR });
@@ -203,12 +205,13 @@ export function renderLiveDetail(container, ctx) {
       const records = el('div', { class: 'live-records' });
       let openKey = null;
       let saving = false;
+      let isDirty = () => false; // 開いている節の入力が、保存済みの値と違うか
       const drawRecords = (focusKey = null) => {
-        const open = (key) => { if (saving) return; openKey = key; drawRecords(); records.querySelector('textarea, input')?.focus(); };
+        const open = (key) => { if (saving) return; if (openKey && openKey !== key && isDirty() && !confirm(DISCARD_CONFIRM)) return; openKey = key; drawRecords(); records.querySelector('textarea, input')?.focus(); };
         const close = (key) => { if (openKey !== key) return; openKey = null; drawRecords(key); };
         const onSaving = (v) => { saving = v; for (const b of records.querySelectorAll('.live-record-edit')) b.disabled = v; };
         const part = (key, build) => (openKey === key
-          ? editSection(key, live, { ctx, onSaving, onSaved: () => close(key), onCancel: () => close(key) })
+          ? editSection(key, live, { ctx, onSaving, register: (fn) => { isDirty = fn; }, onSaved: () => close(key), onCancel: () => close(key) })
           : build({ key, open }));
         setChildren(records,
           part('venue', (edit) => venueSection(live, edit)),

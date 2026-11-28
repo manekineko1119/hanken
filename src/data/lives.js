@@ -1,6 +1,6 @@
 // ライブの保存・読み込み（Supabase）。薄く保つ。判断は src/core/ に置く。
 import { getClient } from '../auth/auth.js';
-import { planArtistChanges } from '../core/live-form.js';
+import { planArtistChanges, changedLiveFields } from '../core/live-form.js';
 import { removeLivePhotoFiles } from './photos.js';
 
 function check({ error }) {
@@ -32,7 +32,8 @@ export async function getLive(id) {
 // upsert は使わない（設計 5.2）。出演者は差分で保存する（行を消して入れ直すと、プレイリストが cascade で消える）。
 // 新規 live の作成後に失敗したら、err.liveId に id を付ける（画面は update として再試行できる）。
 // loadedIds：編集の画面を開いたときの出演者の id。消すのはこの中だけ（core/live-form.js の planArtistChanges）。
-export async function saveLive(live, artists, loadedIds = null) {
+// loadedLive：編集の画面を開いたときの lives の値。あれば（既存のライブ）変えた欄だけを送る。
+export async function saveLive(live, artists, loadedIds = null, loadedLive = null) {
   const db = getClient();
   const fields = {
     date: live.date,
@@ -48,7 +49,8 @@ export async function saveLive(live, artists, loadedIds = null) {
   };
   let id = live.id;
   if (id) {
-    check(await db.from('lives').update(fields).eq('id', id));
+    const changed = loadedLive ? changedLiveFields(loadedLive, fields) : fields;
+    if (Object.keys(changed).length) check(await db.from('lives').update(changed).eq('id', id));
   } else {
     const { data, error } = await db.from('lives').insert(fields).select('id').single();
     if (error) throw error;

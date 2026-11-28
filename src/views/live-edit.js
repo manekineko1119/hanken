@@ -21,6 +21,8 @@ function initialState(live) {
     afterparty_memo: live?.afterparty_memo ?? '',
     impression: live?.impression ?? '',
     artists: [],
+    // 開いたときの lives の値（既存のライブだけ）。保存のとき、変えた欄だけを送るために覚える
+    loadedLive: live ? { ...live } : null,
   };
   state.artists = live?.artists?.length
     ? live.artists.map((a) => ({ id: a.id, name: a.name, original: a.name }))
@@ -186,7 +188,7 @@ function buildForm(container, state, isNew, alive, initialLives = []) {
     draw();
     const { live, artists } = toPayload(state);
     try {
-      const id = await saveLive(live, artists, deletableIds(state));
+      const id = await saveLive(live, artists, deletableIds(state), state.loadedLive);
       if (alive()) location.hash = `#/live/${encodeURIComponent(id)}`;
       return;
     } catch (err) {
