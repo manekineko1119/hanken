@@ -49,7 +49,7 @@ export function renderLivePhotos(liveId, ctx) {
     const n = photos.length;
     const file = el('input', { type: 'file', accept: 'image/*', hidden: true, 'aria-label': '写真を選ぶ' });
     const add = canAddPhoto(n)
-      ? el('button', { type: 'button', class: 'live-photos-add', disabled: busy, text: busy ? '保存中…' : '写真を足す' })
+      ? el('button', { type: 'button', class: 'live-photos-add', disabled: busy, text: busy ? '保存中…' : '写真を追加' })
       : null;
     if (add) {
       add.addEventListener('click', () => file.click());
