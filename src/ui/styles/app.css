@@ -626,7 +626,7 @@ button.song-title {
 .live-record-links { display: flex; flex-wrap: wrap; gap: var(--s2); margin: var(--s3) 0; }
 .live-record-hint a { text-decoration: underline; }
 .live-record-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
-.live-record-edit { min-height: 36px; padding: 0 var(--s3); font-size: 14px; }
+.live-record-edit { min-height: 36px; min-width: 4.5em; padding: 0 var(--s3); font-size: 14px; justify-content: center; text-align: center; }
 /* 感想の枠：表示（p）と編集（textarea）で同じ大きさ・同じ位置。長い文は下へ伸びる（約6行ぶんが最小） */
 .live-record-impression { display: block; box-sizing: border-box; width: 100%; min-height: 160px; margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--text); font: inherit; font-size: 16px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
 textarea.live-record-impression { resize: vertical; field-sizing: content; }
