@@ -69,10 +69,17 @@ function extLink(href, label) {
   return el('a', { class: 'button', href, target: '_blank', rel: 'noopener', text: label });
 }
 
-// 見出しの右に「編集」。editor がなければ（ふだん）、その節の中身を出す。
+// 節ごとの編集ボタンの文字と aria-label（ない節は「編集」と「<見出し>を編集」）。
+const EDIT_BUTTON = {
+  venue: { text: '詳細', label: '会場の詳細を編集' },
+  train: { text: 'メモ', label: '終電・打ち上げのメモを編集' },
+};
+
+// 見出しの右に編集ボタン。editor がなければ（ふだん）、その節の中身を出す。
 function section(title, children, edit) {
   const body = children.filter(Boolean);
-  const button = el('button', { type: 'button', class: 'live-record-edit', 'data-section': edit.key, 'aria-label': `${title}を編集`, text: '編集' });
+  const btn = EDIT_BUTTON[edit.key] || { text: '編集', label: `${title}を編集` };
+  const button = el('button', { type: 'button', class: 'live-record-edit', 'data-section': edit.key, 'aria-label': btn.label, text: btn.text });
   button.addEventListener('click', () => edit.open(edit.key));
   return el('section', { class: 'live-record' },
     el('div', { class: 'live-record-head' }, el('h2', { text: title }), button),
