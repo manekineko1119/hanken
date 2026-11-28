@@ -172,10 +172,11 @@ test('privacy.html：上下の戻るリンクは、どちらも class="back" で
   assert.doesNotMatch(h, /半券に戻る/);
 });
 
-test('guide.html：上下の戻るリンクは class="back" で「戻る」、使う画像はすべてあり、メールアドレスがない', () => {
+test('guide.html：上下の戻るリンクは class="back" で「戻る」・設定の画面へ、使う画像はすべてあり、メールアドレスがない', () => {
   const h = readFileSync(new URL('guide.html', root), 'utf8');
-  const links = [...h.matchAll(/<a class="back" href="\.\/">([^<]*)<\/a>/g)];
+  const links = [...h.matchAll(/<a class="back" href="\.\/#\/settings">([^<]*)<\/a>/g)];
   assert.equal(links.length, 2);
+  assert.doesNotMatch(h, /<a class="back" href="\.\/">/);
   for (const l of links) assert.equal(l[1], '戻る');
   const imgs = [...h.matchAll(/<img [^>]*src="\.\/([^"]+)"/g)].map((m) => m[1]);
   assert.ok(imgs.length > 10);
