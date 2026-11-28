@@ -164,10 +164,11 @@ test('main.js から静的 import をたどって届くファイルは、すべ�
   }
 });
 
-test('privacy.html：上下の戻るリンクは、どちらも class="back" で「戻る」', () => {
+test('privacy.html：上下の戻るリンクは、どちらも class="back" で「戻る」・設定の画面へ', () => {
   const h = readFileSync(new URL('privacy.html', root), 'utf8');
-  const links = [...h.matchAll(/<a class="back" href="\.\/">([^<]*)<\/a>/g)];
+  const links = [...h.matchAll(/<a class="back" href="\.\/#\/settings">([^<]*)<\/a>/g)];
   assert.equal(links.length, 2);
+  assert.doesNotMatch(h, /<a class="back" href="\.\/">/);
   for (const l of links) assert.equal(l[1], '戻る');
   assert.doesNotMatch(h, /半券に戻る/);
 });
