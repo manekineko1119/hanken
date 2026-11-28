@@ -108,7 +108,7 @@ function editSection(key, live, { onSaved, onCancel, onSaving, ctx, register }) 
     input.value = text(live[k]);
     inputs[k] = input;
     // 感想は見出しの下に、表示のときと同じ位置・同じ大きさで出す（ラベルを足すと位置がずれる）
-    return el('div', { class: 'field' }, isImpression ? null : el('label', { for: id, class: 'label', text: label }), input);
+    return el('div', { class: isImpression ? 'live-record-field' : 'field' }, isImpression ? null : el('label', { for: id, class: 'label', text: label }), input);
   });
   register?.(() => isSectionDirty(key, live, Object.fromEntries(Object.entries(inputs).map(([k, i]) => [k, i.value]))));
   const save = el('button', { type: 'submit', class: 'primary', text: '保存' });
