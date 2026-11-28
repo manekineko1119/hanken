@@ -69,10 +69,10 @@ function extLink(href, label) {
   return el('a', { class: 'button', href, target: '_blank', rel: 'noopener', text: label });
 }
 
-// 見出しの右に「直す」。editor がなければ（ふだん）、その節の中身を出す。
+// 見出しの右に「編集」。editor がなければ（ふだん）、その節の中身を出す。
 function section(title, children, edit) {
   const body = children.filter(Boolean);
-  const button = el('button', { type: 'button', class: 'live-record-edit', 'data-section': edit.key, 'aria-label': `${title}を直す`, text: '直す' });
+  const button = el('button', { type: 'button', class: 'live-record-edit', 'data-section': edit.key, 'aria-label': `${title}を編集`, text: '編集' });
   button.addEventListener('click', () => edit.open(edit.key));
   return el('section', { class: 'live-record' },
     el('div', { class: 'live-record-head' }, el('h2', { text: title }), button),
@@ -94,12 +94,14 @@ function editSection(key, live, { onSaved, onCancel, onSaving, ctx, register }) 
   const inputs = {};
   const rows = def.fields.map(([k, label, kind]) => {
     const id = `live-record-${key}-${k}`;
+    const isImpression = k === 'impression';
     const input = kind === 'textarea'
-      ? el('textarea', { id, rows: k === 'impression' ? '4' : '3' })
+      ? el('textarea', isImpression ? { id, class: 'live-record-impression', 'aria-label': label } : { id, rows: '3' })
       : el('input', { id, type: 'text', autocomplete: 'off' });
     input.value = text(live[k]);
     inputs[k] = input;
-    return el('div', { class: 'field' }, el('label', { for: id, class: 'label', text: label }), input);
+    // 感想は見出しの下に、表示のときと同じ位置・同じ大きさで出す（ラベルを足すと位置がずれる）
+    return el('div', { class: 'field' }, isImpression ? null : el('label', { for: id, class: 'label', text: label }), input);
   });
   register?.(() => isSectionDirty(key, live, Object.fromEntries(Object.entries(inputs).map(([k, i]) => [k, i.value]))));
   const save = el('button', { type: 'submit', class: 'primary', text: '保存' });
@@ -178,7 +180,8 @@ function trainSection(live, home, edit) {
 }
 
 function impressionSection(live, edit) {
-  return section('感想', [memoP(null, live.impression)], edit);
+  // 感想は、空でも決まった大きさの枠を出す（「まだありません」は出さない）。
+  return section('感想', [el('p', { class: 'live-record-impression', text: text(live.impression) })], edit);
 }
 
 export function renderLiveDetail(container, ctx) {
