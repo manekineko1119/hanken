@@ -132,6 +132,7 @@ export function renderSettings(container, ctx) {
       el('section', { class: 'settings-section' },
         el('h2', { text: 'アカウント' }),
         out,
+        el('p', {}, el('a', { href: './guide.html', text: '使い方ガイド' })),
         el('p', {}, el('a', { href: './privacy.html', text: 'プライバシーポリシー' }))),
     );
   });

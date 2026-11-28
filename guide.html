@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1d1c1a">
+  <title>使い方ガイド - 半券</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="./src/ui/styles/app.css">
+  <style>
+    /* 使い方ガイドだけの見た目。画面の画像と説明を並べる（狭い画面では縦に積む）。 */
+    .guide h2 { margin-top: var(--s7); padding-bottom: var(--s2); border-bottom: 1px solid var(--accent); font-size: 1.25rem; color: var(--text); }
+    .guide h2 .no { color: var(--accent); margin-right: var(--s2); }
+    .guide h3 { margin: var(--s5) 0 var(--s2); }
+    .guide .shot { display: grid; gap: var(--s4); margin: var(--s5) 0; }
+    .guide .shot .imgs { display: flex; gap: var(--s3); }
+    .guide .shot img { display: block; width: 100%; max-width: 220px; height: auto; border: 1px solid var(--line); border-radius: 10px; }
+    .guide .shot .imgs.pair img { max-width: calc(50% - var(--s3) / 2); }
+    .guide .shot p, .guide .shot ul, .guide .shot ol { margin-top: 0; }
+    .guide b.ui { color: var(--accent-text); background: var(--accent); padding: 0 6px; border-radius: 4px; font-weight: 600; white-space: nowrap; }
+    .guide .tip { background: var(--surface); border-left: 3px solid var(--accent); padding: var(--s3) var(--s4); border-radius: 0 8px 8px 0; margin: var(--s3) 0; }
+    .guide .tip strong { color: var(--accent); }
+    .guide table { width: 100%; border-collapse: collapse; margin: var(--s3) 0; }
+    .guide th, .guide td { border-bottom: 1px solid var(--line); padding: var(--s2); text-align: left; vertical-align: top; }
+    .guide th { width: 34%; color: var(--accent); font-weight: 600; }
+    .guide .toc li { margin-bottom: var(--s2); }
+    .guide .flow { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+    .guide .flow span { background: var(--surface); border-radius: 6px; padding: 2px 10px; }
+    .guide .flow i { color: var(--accent); font-style: normal; }
+    @media (min-width: 600px) {
+      .guide .shot { grid-template-columns: 220px 1fr; }
+      .guide .shot.pair { grid-template-columns: 400px 1fr; }
+      .guide .shot .imgs.pair img { max-width: 194px; }
+    }
+    /* 印刷・PDF：白い紙に黒い文字。章ごとにページを分ける。 */
+    @media print {
+      @page { size: A4; margin: 14mm; }
+      :root { --bg: #fff; --text: #22201c; --muted: #5e574b; --line: #d8d0c0; --surface: #f4efe4; --accent: #8a6d33; --accent-text: #fff; }
+      body { background: #fff; color: #22201c; }
+      main { max-width: none; padding: 0; }
+      .guide a.back { display: none; }
+      .guide h2 { break-before: page; }
+      .guide .toc-head { break-before: auto; }
+      .guide .shot { break-inside: avoid; grid-template-columns: 200px 1fr; }
+      .guide .shot.pair { grid-template-columns: 380px 1fr; }
+      .guide .shot .imgs.pair img { max-width: 184px; }
+      .guide .tip, .guide table { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main class="guide">
+    <a class="back" href="./">戻る</a>
+    <h1>半券 使い方ガイド</h1>
+    <p class="note">テスターのみなさんへ。2026年11月28日版です。画面はテスト中のもので、変わることがあります。ガイドの画面は、見本のデータ（架空のライブと曲）で撮っています。</p>
+    <p>「半券」は、行くライブを登録して、出演するアーティストの<b>予習プレイリスト</b>を作り、YouTube Music に保存できるアプリです。ライブのあとは、<b>セトリのプレイリスト</b>や、会場・終電・感想・写真の<b>記録</b>も残せます。</p>
+
+    <h2 class="toc-head">もくじ</h2>
+    <ol class="toc">
+      <li><a href="#start">はじめ方</a></li>
+      <li><a href="#screen">画面の見方</a></li>
+      <li><a href="#lives">ライブを登録する</a></li>
+      <li><a href="#record">ライブの記録（会場・終電・感想・写真）</a></li>
+      <li><a href="#prep">予習プレイリストを作る</a></li>
+      <li><a href="#edit">プレイリストを直す</a></li>
+      <li><a href="#setlist">セトリのプレイリストを作る</a></li>
+      <li><a href="#save">YouTube Music に保存する</a></li>
+      <li><a href="#limits">1日に使える回数</a></li>
+      <li><a href="#list">プレイリストの一覧</a></li>
+      <li><a href="#settings">設定</a></li>
+    </ol>
+
+    <!-- 1 -->
+    <h2 id="start"><span class="no">1</span>はじめ方</h2>
+    <h3>アプリを開く</h3>
+    <p>スマホのブラウザで <b>https://manekineko1119.github.io/hanken/</b> を開きます。インストールは要りません。</p>
+    <h3>ホーム画面に追加する（おすすめ）</h3>
+    <ul>
+      <li><b>iPhone（Safari）</b>：画面下の <b class="ui">共有</b>（四角から上向きの矢印）→ <b class="ui">ホーム画面に追加</b> → <b class="ui">追加</b></li>
+      <li><b>Android（Chrome）</b>：右上の <b class="ui">︙</b> → <b class="ui">ホーム画面に追加</b>（または <b class="ui">アプリをインストール</b>）。項目が出ないときは、Chrome を閉じて開き直してください</li>
+    </ul>
+    <div class="shot">
+      <div class="imgs"><img src="./guide/01-login.jpg" alt="ログインの画面" width="750" height="1624" loading="lazy"></div>
+      <div>
+        <h3>ログインする</h3>
+        <p>招待した人だけが使えます。<b class="ui">Google でログイン</b> を押し、管理者に伝えた Google アカウントを選びます。</p>
+        <div class="tip"><strong>「このアカウントは招待されていません」と出たら</strong>　管理者に伝えたアカウントと違うものを選んでいます。選び直すか、管理者に連絡してください。</div>
+        <div class="tip"><strong>「Google はこのアプリを確認していません」と出たら</strong>　テスト中のため、この表示が出ることがあります。アプリの名前が「半券」なら、<b>詳細</b> から先へ進んで大丈夫です。</div>
+        <p>ふだんのログインで使うのは、名前とメールアドレスだけです。YouTube の権限は、プレイリストを保存するときに別に聞きます（8章）。</p>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <h2 id="screen"><span class="no">2</span>画面の見方</h2>
+    <div class="shot">
+      <div class="imgs"><img src="./guide/02-lives.jpg" alt="ライブの一覧と下のメニュー" width="750" height="1624" loading="lazy"></div>
+      <div>
+        <p>画面のいちばん下のメニューで、画面を切り替えます。</p>
+        <table>
+          <tr><th>ライブ</th><td>登録したライブの一覧。予習・セトリ・記録は、ここからライブを開いて作ります</td></tr>
+          <tr><th>プレイリスト</th><td>作ったプレイリストの一覧。ライブなしで、アーティスト名だけでも予習を作れます</td></tr>
+          <tr><th>設定</th><td>YouTube のつながり・自分の最寄り駅・ログアウト・このガイド</td></tr>
+        </table>
+        <div class="flow"><span>ライブを登録</span><i>→</i><span>予習を作る</span><i>→</i><span>YouTube Music に保存</span><i>→</i><span>ライブに行く</span><i>→</i><span>セトリ・記録を残す</span></div>
+        <div class="tip"><strong>データはあなただけのもの</strong>　ライブ・記録・写真・プレイリストは、自分だけが見られます。ほかのテスターには見えません。YouTube に保存するプレイリストも「非公開」です。</div>
+        <div class="tip"><strong>広い画面では</strong>　折りたたみスマホを開いたときや PC では、一覧が2列になったり、一覧と中身が左右に並んだりします。</div>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <h2 id="lives"><span class="no">3</span>ライブを登録する</h2>
+    <div class="shot">
+      <div class="imgs"><img src="./guide/02-lives.jpg" alt="ライブの一覧" width="750" height="1624" loading="lazy"></div>
+      <div>
+        <h3>ライブの一覧</h3>
+        <ul>
+          <li><b>これから</b>：今日からあとのライブ。ミシン目の先に半券が付いた券で出ます</li>
+          <li><b>行った</b>：終わったライブ。半券を切り取ったあとの短い券で出ます</li>
+        </ul>
+        <p>券を押すと詳細が開きます。新しく登録するときは、右上の <b class="ui">ライブを登録</b> を押します。</p>
+      </div>
+    </div>
+    <div class="shot">
+      <div class="imgs"><img src="./guide/03-live-new.jpg" alt="ライブを登録する画面" width="750" height="3120" loading="lazy"></div>
+      <div>
+        <h3>入れるもの</h3>
+        <ul>
+          <li><b>日付</b>：ライブの日（必ず入れる）</li>
+          <li><b>会場・住所・会場の最寄り駅・行き方のメモ</b>：会場のこと。住所か会場名があると、地図で行き方を開けます</li>
+          <li><b>タイトル</b>：ツアー名やイベント名。空でもかまいません（一覧では「タイトル未設定」）</li>
+          <li><b>メモ</b>：開場・開演の時刻、物販のことなど</li>
+          <li><b>出演者</b>：1組ずつ入れます。対バンなら <b class="ui">出演者を足す</b> で増やし、<b class="ui">↑</b> <b class="ui">↓</b> で順番を変えます</li>
+          <li><b>終電のメモ・打ち上げ・感想</b>：ライブのあとで入れてもかまいません（4章）</li>
+        </ul>
+        <p>入れ終わったら <b class="ui">保存</b> を押します。</p>
+        <div class="tip"><strong>前に行った会場なら</strong>　会場名を入れると、同じ会場の前のライブから、住所・最寄り駅・行き方のメモを空いている欄にだけ写します（「前の〇〇のライブから写しました」と出ます）。</div>
+      </div>
+    </div>
+    <div class="shot">
+      <div class="imgs"><img src="./guide/04-live-detail.jpg" alt="ライブの詳細の上側" width="750" height="2000" loading="lazy"></div>
+      <div>
+        <h3>ライブの詳細</h3>
+        <p>出演者ごとに、<b>予習</b>と<b>セトリ</b>のプレイリストの状態が出ます。</p>
+        <ul>
+          <li><b>未作成</b>：<b class="ui">作る</b> で作ります（予習は5章、セトリは7章）</li>
+          <li><b>下書き</b>：アプリの中にあり、YouTube Music にはまだ保存していません。<b class="ui">開く</b> で開きます</li>
+          <li><b>保存済み</b>：YouTube Music に保存しました</li>
+        </ul>
+        <p>いちばん下の <b class="ui">編集</b> でライブを直し、<b class="ui">削除</b> で消します。</p>
+        <div class="tip"><strong>ライブを消すと</strong>　アプリの中の予習・セトリの記録と写真も消えます。YouTube Music に保存したプレイリストは残ります。</div>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <h2 id="record"><span class="no">4</span>ライブの記録（会場・終電・感想・写真）</h2>
+    <p>ライブの詳細の出演者の下に、記録の欄が並びます。欄ごとの右のボタンで、その場で書き直せます。</p>
+    <div class="shot pair">
+      <div class="imgs pair"><img src="./guide/05-records.jpg" alt="会場・終電と打ち上げ・感想の欄" width="750" height="1960" loading="lazy"><img src="./guide/06-record-edit.jpg" alt="会場の欄を書き直しているところ" width="750" height="1800" loading="lazy"></div>
+      <div>
+        <h3>会場</h3>
+        <p>会場名・住所・最寄り駅・行き方のメモが出ます。</p>
+        <ul>
+          <li><b class="ui">行き方</b>：Google マップで、今いる場所から会場までの電車の行き方を開きます</li>
+          <li><b class="ui">周りの店</b>：会場の近くの飲食店を Google マップで開きます</li>
+          <li><b class="ui">詳細</b>：住所・会場の最寄り駅・行き方のメモを書き直します（右の画面）。会場名は、いちばん下の <b class="ui">編集</b> で直します</li>
+        </ul>
+        <h3>終電・打ち上げ</h3>
+        <ul>
+          <li><b class="ui">終電を調べる</b>：Yahoo!乗換案内で、会場の最寄り駅から自分の最寄り駅までの、その日の終電を開きます</li>
+          <li><b class="ui">メモ</b>：終電のメモと、打ち上げのお店などを書きます</li>
+        </ul>
+        <div class="tip"><strong>「終電を調べる」が出ないときは</strong>　<b>会場の最寄り駅</b>（会場の <b class="ui">詳細</b>）と、<b>自分の最寄り駅</b>（設定の画面、11章）の両方を入れてください。</div>
+        <h3>感想</h3>
+        <p><b class="ui">編集</b> で書きます。書いたら <b class="ui">保存</b>、やめるときは <b class="ui">キャンセル</b>。</p>
+      </div>
+    </div>
+    <div class="shot pair">
+      <div class="imgs pair"><img src="./guide/07-photos.jpg" alt="写真の欄" width="750" height="1624" loading="lazy"><img src="./guide/09-photo-view.jpg" alt="写真を大きく見ているところ" width="750" height="1624" loading="lazy"></div>
+      <div>
+        <h3>写真</h3>
+        <ul>
+          <li>1つのライブに <b>5枚まで</b> 残せます。<b class="ui">写真を追加</b> で選びます</li>
+          <li>写真は保存するときに小さく作り直すので、撮った場所などの情報は残りません</li>
+          <li>写真を押すと大きく出ます（右の画面）。左右にめくるか <b class="ui">‹</b> <b class="ui">›</b> で次の写真へ。<b class="ui">閉じる</b> で戻ります</li>
+        </ul>
+      </div>
+    </div>
+    <div class="shot">
+      <div class="imgs"><img src="./guide/08-photo-select.jpg" alt="消す写真を選んでいるところ" width="750" height="1624" loading="lazy"></div>
+      <div>
+        <h3>写真を消す</h3>
+        <ol>
+          <li><b class="ui">写真を削除</b> を押す</li>
+          <li>消したい写真を押して選ぶ（印が付きます。何枚でも）</li>
+          <li><b class="ui">選んだ 〇 枚を削除</b> を押し、確認で <b>OK</b></li>
+        </ol>
+        <p>やめるときは <b class="ui">キャンセル</b> です。</p>
+      </div>
+    </div>
+
+    <!-- 5 -->
+    <h2 id="prep"><span class="no">5</span>予習プレイリストを作る</h2>
+    <p>ライブの詳細で、出演者の予習の <b class="ui">作る</b> を押すと、そのアーティストの曲を10曲選んだプレイリストが自動でできます。人気の高い曲を中心に、いちばん新しい曲も1曲入ります。</p>
+    <div class="shot">
+      <div class="imgs"><img src="./guide/10-artist-pick.jpg" alt="アーティストを選ぶ画面" width="750" height="1624" loading="lazy"></div>
+      <div>
+        <h3>同じような名前のアーティストがいるとき</h3>
+        <p>「〇〇はどのアーティスト？」と聞かれたら、候補（ジャンルつき）から出演するアーティストを押します。選んだアーティストの正式な名前で曲を探すので、ひらがなやカタカナで入れていても大丈夫です。</p>
+        <p>候補にいないときは <b class="ui">見つからない</b> で戻り、名前を直してもう一度 <b class="ui">作る</b> を押します。</p>
+        <div class="tip"><strong>「iTunes で見つかりませんでした」と出たら</strong>　曲の情報は iTunes から取っています。名前の綴りを確かめてください。</div>
+      </div>
+    </div>
+    <div class="shot">
+      <div class="imgs"><img src="./guide/11-playlist.jpg" alt="できた予習プレイリスト" width="750" height="2300" loading="lazy"></div>
+      <div>
+        <h3>できたプレイリスト</h3>
+        <p>名前は「【予習】アーティスト名（日付 会場）」です。この時点では、アプリの中だけにある「下書き」です。直すときは6章、YouTube Music に入れるときは8章へ。</p>
+        <div class="tip"><strong>「人気の順のデータがないため、新しい順です」と出たら</strong>　人気の順位が取れないアーティストは、新しい曲から順に選びます。</div>
+      </div>
+    </div>
+
+    <!-- 6 -->
+    <h2 id="edit"><span class="no">6</span>プレイリストを直す</h2>
+    <div class="shot">
+      <div class="imgs"><img src="./guide/12-playlist-edit.jpg" alt="編集のモード" width="750" height="2300" loading="lazy"></div>
+      <div>
+        <h3>曲を消す・並べ替える</h3>
+        <p><b class="ui">編集</b> を押すと、曲の行に印が出ます。終わったら <b class="ui">完了</b>。</p>
+        <ul>
+          <li><b>ゴミ箱</b>：その曲を消します。予習では、空いたところに次の候補の曲が自動で入ります</li>
+          <li><b>≡</b>：つかんで上下に動かすと、順番を変えられます。予習のいちばん新しい曲は動かせません</li>
+        </ul>
+        <h3>曲を足す</h3>
+        <p>下の <b>曲名</b> の欄に入れて <b class="ui">足す</b>。同じ曲は2回入れられません。</p>
+        <p>直した内容は、その場で自動で保存されます。</p>
+      </div>
+    </div>
+    <div class="shot">
+      <div class="imgs"><img src="./guide/13-rename.jpg" alt="名前を変える" width="750" height="1240" loading="lazy"></div>
+      <div>
+        <h3>名前を変える</h3>
+        <p>見出しの下の <b class="ui">名前を変更</b> → 入れ直して <b class="ui">決める</b>（やめるときは <b class="ui">やめる</b>）。YouTube Music に保存したあとは、「保存の確認」の画面（8章）で名前を変えて反映します。</p>
+        <h3>プレイリストを消す</h3>
+        <p>いちばん下の <b class="ui">このプレイリストを消す</b> で消せます。消えるのはアプリの中の記録だけです。YouTube Music に保存したものは残るので、要らなければ YouTube Music の側で消してください。</p>
+      </div>
+    </div>
+
+    <!-- 7 -->
+    <h2 id="setlist"><span class="no">7</span>セトリのプレイリストを作る</h2>
+    <p>ライブのあと、X やインスタに出たセトリのスクショや、会場に貼られたセトリの紙の写真から、そのライブで聴いた曲のプレイリストを作れます。ライブの詳細で、出演者のセトリの <b class="ui">作る</b> を押します。</p>
+    <div class="shot">
+      <div class="imgs"><img src="./guide/17-setlist-read.jpg" alt="セトリを作る画面" width="750" height="1800" loading="lazy"></div>
+      <div>
+        <h3>画像から読む</h3>
+        <ol>
+          <li><b class="ui">スクショ・写真を選ぶ</b> を押す</li>
+          <li>セトリの画像を選ぶ（<b>4枚まで</b>。2枚に分かれたスクショもまとめて読めます）</li>
+          <li>読めた曲名で、下書きのセトリができます</li>
+        </ol>
+        <h3>文字を貼り付けて作る</h3>
+        <p>セトリが文字で手元にあるときや、画像が読めなかったときは、<b>文字を貼り付けて作る</b> を開き、曲名を1行に1曲ずつ貼り付けて <b class="ui">この文字で作る</b> を押します。</p>
+        <div class="tip"><strong>画像は保存しません</strong>　読み取りに使った画像と、読めた文字そのものは残りません。残るのは、下書きのセトリの曲名だけです。</div>
+        <div class="tip"><strong>読み取りには回数の上限があります</strong>　1人1日10回まで（9章）。上限のときも、文字の貼り付けなら作れます。</div>
+      </div>
+    </div>
+    <div class="shot pair">
+      <div class="imgs pair"><img src="./guide/18-setlist.jpg" alt="できたセトリのプレイリスト" width="750" height="2000" loading="lazy"><img src="./guide/19-setlist-rename.jpg" alt="曲名を直しているところ" width="750" height="2000" loading="lazy"></div>
+      <div>
+        <h3>できたセトリを確かめる</h3>
+        <ul>
+          <li>読み取りに自信のない曲には <b>要確認</b> の印が付きます</li>
+          <li>曲名を押すと、その場で直せます（右の画面）。直したら <b class="ui">保存</b>、やめるときは <b class="ui">キャンセル</b></li>
+          <li>MC やライブ名・日付などの行と、曲名の後ろの演奏メモ（Acoustic・ver. など）は、できるだけ外して読みます</li>
+          <li><b class="ui">画像・文字から読み直す</b>：読み直して、今のセトリと置き換えます（確認が出ます）</li>
+        </ul>
+        <p>曲の消す・並べ替え・足す・名前の変更は、予習と同じです（6章）。名前は「【セトリ】アーティスト名（日付 会場）」です。YouTube Music への保存も予習と同じです（8章）。</p>
+      </div>
+    </div>
+
+    <!-- 8 -->
+    <h2 id="save"><span class="no">8</span>YouTube Music に保存する</h2>
+    <p>プレイリストの画面の <b class="ui">YouTube Music に保存</b> を押すと、「保存の確認」の画面が開きます。保存したプレイリストは、あなたの YouTube Music のライブラリに<b>非公開</b>で入ります。</p>
+    <div class="shot">
+      <div class="imgs"><img src="./guide/16-confirm-off.jpg" alt="YouTube につなぐ" width="750" height="1400" loading="lazy"></div>
+      <div>
+        <h3>はじめて保存するとき：YouTube につなぐ</h3>
+        <ol>
+          <li><b class="ui">YouTube につなぐ</b> を押す</li>
+          <li>Google の画面でアカウントを選ぶ（「確認していません」と出たら <b>詳細</b> から先へ）</li>
+          <li>権限の画面で、<b>YouTube の項目にチェックを入れて</b> 進む</li>
+          <li>自動で半券の画面に戻ります</li>
+        </ol>
+        <div class="tip"><strong>チェックを入れ忘れたら</strong>　「YouTube の権限にチェックが入っていませんでした」と出ます。もう一度つないで、チェックを入れてください。</div>
+        <div class="tip"><strong>つながりは7日で切れます</strong>　テスト中のため、つないでから7日で切れます。切れたあとに保存するときは、もう一度つなぐ画面が出ます。ふだんのログインには影響しません。</div>
+      </div>
+    </div>
+    <div class="shot pair">
+      <div class="imgs pair"><img src="./guide/14-confirm.jpg" alt="保存の確認" width="750" height="2760" loading="lazy"><img src="./guide/15-confirm-saved.jpg" alt="保存したあと" width="750" height="2760" loading="lazy"></div>
+      <div>
+        <h3>保存の確認</h3>
+        <p>アプリが YouTube Music で曲を探し、結果を見せます。</p>
+        <ul>
+          <li><b>プレイリストの名前</b>：ここでも変えられます</li>
+          <li><b>入れる曲</b>：見つかった曲。少し違う版（ライブ版など）のときは「YouTube Music では：〜」と出ます</li>
+          <li><b>YouTube Music で見つからなかった曲</b>：この曲は入りません</li>
+        </ul>
+        <p>よければ <b class="ui">OK（非公開で保存）</b>。保存できると「〇曲を入れました」と出て、<b class="ui">YouTube Music で開く</b> で聴けます。</p>
+        <div class="tip"><strong>保存したあとに曲を直したら</strong>　プレイリストの画面に「YouTube Music にまだ反映していません」と出ます。<b class="ui">YouTube Music に反映</b> で、同じプレイリストの中身を入れ替えます（新しいプレイリストは増えません）。YouTube の側で公開に変えたプレイリストには、反映しません。</div>
+      </div>
+    </div>
+
+    <!-- 9 -->
+    <h2 id="limits"><span class="no">9</span>1日に使える回数</h2>
+    <p>YouTube と Google の無料の枠の中で動かしているため、使える回数を決めています。</p>
+    <table>
+      <tr><th>曲を探す（保存の確認）</th><td><b>1人 1日30回</b>。1曲につき1回なので、新しい10曲なら10回です。30日以内に誰かが探した曲は、その記録を使うので数えません</td></tr>
+      <tr><th>YouTube Music に保存・反映</th><td><b>1人 1日5回</b>。押すたびに1回です。失敗したときは数えません</td></tr>
+      <tr><th>セトリの画像の読み取り</th><td><b>1人 1日10回</b>（1回で4枚まで）。テスター全員で月800枚まで。読み取りに失敗しても1回と数えます</td></tr>
+      <tr><th>テスター全員の合計</th><td>曲を探すのは、<b>全員で1日90回</b>まで。ほかの人がたくさん探した日は、30回より前に止まることがあります</td></tr>
+      <tr><th>上限のないもの</th><td>ライブの登録・記録・写真（1つのライブに5枚まで）、予習を作る、文字の貼り付けでセトリを作る、曲を直す、名前を変える、消す</td></tr>
+    </table>
+    <ul>
+      <li>1人の回数は、日本時間の<b>0時</b>に戻ります</li>
+      <li>全員の合計と YouTube 全体の枠は、日本時間の<b>17時ごろ</b>（夏は16時ごろ）に戻ります。「今日の YouTube の枠がいっぱいです」と出たときも、この時刻のあとに試してください</li>
+      <li>月の読み取りの枚数は、毎月1日の17時ごろ（夏は16時ごろ）に戻ります</li>
+      <li>上限を超えても、それまでに見つかった曲はそのまま残ります</li>
+    </ul>
+
+    <!-- 10 -->
+    <h2 id="list"><span class="no">10</span>プレイリストの一覧</h2>
+    <div class="shot">
+      <div class="imgs"><img src="./guide/20-prep.jpg" alt="プレイリストの一覧" width="750" height="2600" loading="lazy"></div>
+      <div>
+        <p>メニューの <b class="ui">プレイリスト</b> で開きます。予習とセトリのプレイリストが並び、押すとプレイリストの画面が開きます。</p>
+        <ul>
+          <li><b>探す</b>：アーティスト名・タイトルで絞ります</li>
+          <li><b>並び順</b>：新しい順・古い順・ライブ順</li>
+          <li><b>種類</b>：すべて・予習・セトリ</li>
+          <li><b>保存済み</b> のものは <b class="ui">YouTube Music で開く</b> から、すぐ聴けます</li>
+        </ul>
+        <h3>アーティスト名だけで予習を作る</h3>
+        <p>ライブの予定がなくても、いちばん下にアーティスト名を入れて <b class="ui">アーティスト名から作る</b> を押すと作れます。名前は「【予習】アーティスト名」で、一覧には「ライブなし」と出ます。</p>
+      </div>
+    </div>
+
+    <!-- 11 -->
+    <h2 id="settings"><span class="no">11</span>設定</h2>
+    <div class="shot">
+      <div class="imgs"><img src="./guide/21-settings.jpg" alt="設定の画面" width="750" height="2000" loading="lazy"></div>
+      <div>
+        <h3>YouTube</h3>
+        <ul>
+          <li>つながっているチャンネルの名前と、切れるまでのおよその日数が出ます</li>
+          <li><b class="ui">切断</b>：YouTube とのつながりを切ります。保存したプレイリストは YouTube Music に残ります</li>
+          <li>つながっていないときは <b class="ui">YouTube につなぐ</b> が出ます（8章）</li>
+        </ul>
+        <h3>最寄り駅</h3>
+        <p>自分の最寄り駅を入れて <b class="ui">保存</b>。「終電を調べる」で、帰りの駅として使います（4章）。</p>
+        <h3>アカウント</h3>
+        <ul>
+          <li><b class="ui">ログアウト</b>：ログインをやめます。記録はアカウントに残り、もう一度ログインすれば元どおり見られます</li>
+          <li><b>使い方ガイド</b>：このページです</li>
+          <li><b>プライバシーポリシー</b>：アプリが使うデータ・送り先・消し方を書いています</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2 class="toc-head" style="break-before: auto">困ったときは</h2>
+    <p>動きがおかしいとき、分からないときは、このアプリを紹介した人（あなたを招待した人）に、画面の様子と一緒に伝えてください。</p>
+
+    <a class="back" href="./">戻る</a>
+  </main>
+</body>
+</html>

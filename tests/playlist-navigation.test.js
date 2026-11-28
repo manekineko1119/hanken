@@ -378,6 +378,7 @@ test('設定の YouTube 状態・操作とアカウントの項目は囲いの�
   assert.ok(main.find((node) => node.attributes.role === 'alert' && node.textContent.includes('YouTube の権限')));
   assert.ok(main.find((node) => node.tag === 'button' && node.textContent === 'ログアウト'));
   assert.equal(main.find((node) => node.textContent === 'プライバシーポリシー').attributes.href, './privacy.html');
+  assert.equal(main.find((node) => node.textContent === '使い方ガイド').attributes.href, './guide.html');
 
   connected = true;
   await navigate('#/settings');

@@ -55,7 +55,7 @@ test('src/ の JS・CSS と主なファイルが、一覧から漏れていな�
   const base = fileURLToPath(root);
   const files = walk(join(base, 'src')).map((p) => './' + relative(base, p).split(sep).join('/'));
   for (const f of files) assert.ok(PRECACHE_URLS.includes(f), `${f} が一覧にない`);
-  for (const f of ['./', './index.html', './privacy.html', './manifest.webmanifest', './vendor/supabase-js.mjs']) {
+  for (const f of ['./', './index.html', './privacy.html', './guide.html', './manifest.webmanifest', './vendor/supabase-js.mjs']) {
     assert.ok(PRECACHE_URLS.includes(f), `${f} が一覧にない`);
   }
 });
@@ -170,4 +170,15 @@ test('privacy.html：上下の戻るリンクは、どちらも class="back" で
   assert.equal(links.length, 2);
   for (const l of links) assert.equal(l[1], '戻る');
   assert.doesNotMatch(h, /半券に戻る/);
+});
+
+test('guide.html：上下の戻るリンクは class="back" で「戻る」、使う画像はすべてあり、メールアドレスがない', () => {
+  const h = readFileSync(new URL('guide.html', root), 'utf8');
+  const links = [...h.matchAll(/<a class="back" href="\.\/">([^<]*)<\/a>/g)];
+  assert.equal(links.length, 2);
+  for (const l of links) assert.equal(l[1], '戻る');
+  const imgs = [...h.matchAll(/<img [^>]*src="\.\/([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(imgs.length > 10);
+  for (const f of imgs) assert.ok(existsSync(new URL(f, root)), `${f} がない`);
+  assert.doesNotMatch(h, /[\w.+-]+@[\w-]+\.[\w.]+/);
 });

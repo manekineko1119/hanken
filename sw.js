@@ -6,7 +6,7 @@
    - 入れるのは、同じオリジンの静的ファイルだけ。
    - パスはすべて相対（./）。GitHub Pages のサブパスでも動くようにする。
    アプリのファイルを足す・消したときは、PRECACHE_URLS を直し、VERSION を上げる（tests/sw.test.js が漏れを見つける）。 */
-var VERSION = 'v17';
+var VERSION = 'v18';
 var CACHE_PREFIX = 'hanken-';
 var CACHE_NAME = CACHE_PREFIX + VERSION;
 
@@ -14,6 +14,7 @@ var PRECACHE_URLS = [
   './',
   './index.html',
   './privacy.html',
+  './guide.html',
   './manifest.webmanifest',
   './icons/favicon-32.png',
   './icons/apple-touch-icon.png',
