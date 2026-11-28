@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { photoPath, canAddPhoto, MAX_PHOTOS, MAX_PHOTO_BYTES, PHOTO_URL_SECONDS, PHOTO_MSG } from '../src/core/photos.js';
+import { photoPath, canAddPhoto, MAX_PHOTOS, MAX_PHOTO_BYTES, PHOTO_URL_SECONDS, PHOTO_MSG, nextIndex, toggleSelected, deleteLabel, deleteConfirm } from '../src/core/photos.js';
 import { listPhotos, addPhoto, deletePhoto, makePhotoBlob } from '../src/data/photos.js';
 import { deleteLive, updateLiveFields } from '../src/data/lives.js';
 
@@ -139,4 +139,26 @@ test('addPhoto: ブラウザが開けない画像（HEIC など）は「読み�
   }
   assert.deepEqual(client.log, []); // 行も作らない
   assert.notEqual(PHOTO_MSG.unreadable, PHOTO_MSG.failed);
+});
+
+test('nextIndex: 端で止まる', () => {
+  assert.equal(nextIndex(0, 3, -1), 0);
+  assert.equal(nextIndex(2, 3, 1), 2);
+  assert.equal(nextIndex(1, 3, 1), 2);
+  assert.equal(nextIndex(1, 3, -1), 0);
+});
+
+test('toggleSelected: 足す・外す・元の Set は変えない', () => {
+  const a = new Set(['x']);
+  const b = toggleSelected(a, 'y');
+  assert.deepEqual([...b], ['x', 'y']);
+  assert.deepEqual([...a], ['x']);
+  const c = toggleSelected(b, 'x');
+  assert.deepEqual([...c], ['y']);
+  assert.deepEqual([...b], ['x', 'y']);
+});
+
+test('deleteLabel・deleteConfirm', () => {
+  assert.equal(deleteLabel(2), '選んだ 2 枚を削除');
+  assert.equal(deleteConfirm(2), '選んだ 2 枚の写真を消しますか？');
 });

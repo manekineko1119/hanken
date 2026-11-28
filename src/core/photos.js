@@ -10,6 +10,7 @@ export const PHOTO_MSG = {
   deleteFailed: '写真を消せませんでした。通信を確かめて、もう一度押してください',
   unreadable: 'この写真は読み込めませんでした。別の写真を選んでください',
   loadFailed: '写真を読み込めませんでした。通信を確かめてください',
+  deletePartial: '消せなかった写真があります。通信を確かめて、もう一度押してください',
 };
 
 // Storage のパス。先頭が自分の user_id であること（Storage の権限がこの形を見る）。
@@ -19,4 +20,24 @@ export function photoPath(userId, liveId, photoId) {
 
 export function canAddPhoto(count) {
   return count < MAX_PHOTOS;
+}
+
+// スライド：端で止まる
+export function nextIndex(i, n, dir) {
+  return Math.min(n - 1, Math.max(0, i + dir));
+}
+
+// 選んだ写真の id の集まり。元の Set は変えず、新しい Set を返す。
+export function toggleSelected(set, id) {
+  const next = new Set(set);
+  if (next.has(id)) next.delete(id); else next.add(id);
+  return next;
+}
+
+export function deleteLabel(n) {
+  return `選んだ ${n} 枚を削除`;
+}
+
+export function deleteConfirm(n) {
+  return `選んだ ${n} 枚の写真を消しますか？`;
 }

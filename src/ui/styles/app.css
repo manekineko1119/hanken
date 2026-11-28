@@ -634,15 +634,23 @@ textarea.live-record-impression { resize: vertical; field-sizing: content; }
 
 /* ライブの詳細の「写真」の節（live-photos 専用。ほかの画面に効かせない） */
 .live-photos { margin-top: var(--s6); }
-.live-photos-grid { list-style: none; margin: 0 0 var(--s3); padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--s2); }
+.live-photos-grid { list-style: none; margin: 0 0 var(--s3); padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s2); }
+@media (min-width: 600px) { .live-photos-grid { grid-template-columns: repeat(3, 1fr); } }
 .live-photos-item { position: relative; aspect-ratio: 1; background: var(--surface); border-radius: var(--radius-paper); overflow: hidden; }
-.live-photos-thumb { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.live-photos-thumb { position: relative; display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .live-photos-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.live-photos-del { position: absolute; right: var(--s1); bottom: var(--s1); width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: var(--radius); background: rgba(21, 20, 18, 0.72); color: var(--danger); cursor: pointer; }
+.live-photos-check { position: absolute; right: var(--s2); top: var(--s2); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; border-radius: 50%; background: rgba(21, 20, 18, 0.55); color: #fff; font-size: 18px; line-height: 1; }
+.live-photos-select.is-selected img { opacity: 0.55; }
+.live-photos-select.is-selected .live-photos-check { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.live-photos-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); margin-bottom: var(--s3); }
+.live-photos-actions .note { flex-basis: 100%; margin: 0; }
 .live-photos-missing { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: var(--s2); box-sizing: border-box; color: var(--muted); font-size: 12px; text-align: center; }
-.live-photos-add { min-height: 44px; }
+.live-photos-add, .live-photos-enter, .live-photos-delete, .live-photos-cancel { min-height: 44px; }
 .live-photos-viewer { width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: var(--s4); box-sizing: border-box; border: 0; background: rgba(21, 20, 18, 0.94); color: inherit; }
 .live-photos-viewer[open] { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s3); }
 .live-photos-viewer::backdrop { background: rgba(21, 20, 18, 0.94); }
-.live-photos-viewer img { max-width: 100%; max-height: calc(100% - 64px); object-fit: contain; }
+.live-photos-counter { margin: 0; color: #fff; font-size: 14px; }
+.live-photos-stage { display: flex; align-items: center; justify-content: center; gap: var(--s2); width: 100%; flex: 1; min-height: 0; touch-action: pan-y; }
+.live-photos-stage img { flex: 1; min-width: 0; max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+.live-photos-prev, .live-photos-next { flex: none; width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 24px; line-height: 1; }
 .live-photos-close { min-height: 44px; padding: 0 var(--s5); }
