@@ -126,7 +126,7 @@ test('privacy.html：アプリ名・取るデータ・30日・取り消し方が
   assert.match(h, /30日/);
   assert.match(h, /YouTube/);
   assert.match(h, /myaccount\.google\.com\/permissions/);
-  assert.match(h, /href="\.\/"/);
+  assert.match(h, /href="\.\/#\/settings"/);
   assert.doesNotMatch(h, /[\w.+-]+@[\w-]+\.[\w.]+/);
 });
 
