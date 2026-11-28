@@ -124,3 +124,19 @@ test('updateLiveFields: 1行返れば成功、0行（権限で止められた）
   await assert.rejects(updateLiveFields('l', {}, fakeUpdateDb({ data: [], error: null }).db));
   await assert.rejects(updateLiveFields('l', {}, fakeUpdateDb({ data: null, error: new Error('x') }).db));
 });
+
+test('addPhoto: ブラウザが開けない画像（HEIC など）は「読み込めません」で、保存失敗とは別の文言', async () => {
+  const client = fakeClient();
+  const orig = globalThis.createImageBitmap;
+  globalThis.createImageBitmap = async () => { throw new Error('decode'); };
+  try {
+    await assert.rejects(
+      addPhoto('l', {}, { client, userId: 'u', newId: () => 'p1' }), // shrink は本物（createImageBitmap を使う）
+      { message: PHOTO_MSG.unreadable },
+    );
+  } finally {
+    globalThis.createImageBitmap = orig;
+  }
+  assert.deepEqual(client.log, []); // 行も作らない
+  assert.notEqual(PHOTO_MSG.unreadable, PHOTO_MSG.failed);
+});

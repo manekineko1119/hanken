@@ -14,21 +14,21 @@ export function renderLivePhotos(liveId, ctx) {
 
   function show(big, opener) {
     const close = el('button', { type: 'button', class: 'live-photos-close', text: '閉じる' });
-    const dialog = el('div', { class: 'live-photos-viewer', role: 'dialog', 'aria-modal': 'true', 'aria-label': '写真' },
+    // <dialog>＋showModal()：フォーカスは中に閉じ込められ、Escape は標準で閉じる（close イベントで後片付け）
+    const dialog = el('dialog', { class: 'live-photos-viewer', 'aria-label': '写真' },
       el('img', { src: big.url, alt: '写真' }), close);
-    const done = (refocus = true) => {
-      dialog.remove();
-      document.removeEventListener('keydown', onKey);
+    let refocus = true;
+    const onHash = () => { refocus = false; dialog.close(); };
+    dialog.addEventListener('close', () => {
       window.removeEventListener('hashchange', onHash);
+      dialog.remove();
       if (refocus && opener?.isConnected) opener.focus();
-    };
-    const onHash = () => done(false);
+    });
     window.addEventListener('hashchange', onHash);
-    const onKey = (e) => { if (e.key === 'Escape') done(); };
-    close.addEventListener('click', () => done());
-    dialog.addEventListener('click', (e) => { if (e.target === dialog) done(); });
-    document.addEventListener('keydown', onKey);
+    close.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
     document.body.append(dialog);
+    dialog.showModal();
     close.focus();
   }
 

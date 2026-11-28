@@ -8,7 +8,12 @@ const BUCKET = 'live-photos';
 
 // 長い辺 1600px までに縮めた JPEG の Blob にする。再エンコードするので、撮った場所などの情報（EXIF）は残らない。
 async function shrinkToJpeg(file, quality) {
-  const bitmap = await createImageBitmap(file);
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error(PHOTO_MSG.unreadable); // HEIC など、ブラウザが開けない画像
+  }
   try {
     const { w, h } = fitSize(bitmap.width, bitmap.height, 1600);
     const canvas = document.createElement('canvas');
@@ -64,8 +69,8 @@ export async function addPhoto(liveId, file, deps = {}) {
   try {
     blob = await makePhotoBlob(file, deps.shrink);
   } catch (err) {
-    if (err.message === PHOTO_MSG.tooBig) throw err;
-    throw new Error(PHOTO_MSG.failed); // HEIC など、ブラウザが開けない画像
+    if (err.message === PHOTO_MSG.tooBig || err.message === PHOTO_MSG.unreadable) throw err;
+    throw new Error(PHOTO_MSG.failed);
   }
   const userId = deps.userId ?? await currentUserId(db);
   const id = (deps.newId ?? (() => crypto.randomUUID()))();

@@ -83,3 +83,12 @@ test('lastTrainState: 出し分け', () => {
   assert.ok(d.url.startsWith('https://transit.yahoo.co.jp/'));
   assert.deepEqual([d.needVenueStation, d.needHome], [false, false]);
 });
+
+test('lastTrainState: 最寄り駅が読み込めなかった（undefined）ときは、未設定のヒントではなく失敗として返す', () => {
+  const live = { date: '2026-11-20', venue_station: '渋谷駅' };
+  const f = lastTrainState(live, undefined);
+  assert.deepEqual([f.url, f.needVenueStation, f.needHome, f.homeFailed], [null, false, false, true]);
+  assert.equal(lastTrainState(live, null).homeFailed, false); // null は「未設定」
+  assert.equal(lastTrainState(live, null).needHome, true);
+  assert.equal(lastTrainState(live, '新宿').homeFailed, false);
+});

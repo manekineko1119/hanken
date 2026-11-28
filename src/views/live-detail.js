@@ -158,7 +158,9 @@ function venueSection(live, edit) {
 function trainSection(live, home, edit) {
   const st = lastTrainState(live, home);
   let link;
-  if (st.url) {
+  if (st.homeFailed) {
+    link = el('p', { class: 'note live-record-hint', text: '最寄り駅を読み込めませんでした。開き直してください' });
+  } else if (st.url) {
     link = el('div', { class: 'live-record-links' }, extLink(st.url, '終電を調べる'));
   } else if (st.needVenueStation || st.needHome) {
     const editLink = st.needVenueStation ? el('a', { href: `#/live/${encodeURIComponent(live.id)}/edit`, text: '編集' }) : el('span', { text: '編集' });
@@ -183,9 +185,9 @@ export function renderLiveDetail(container, ctx) {
     container,
     ctx,
     async () => {
-      // 自分の最寄り駅が読めなくても画面は出す（終電のところでヒントを出す）。
+      // 自分の最寄り駅が読めなくても画面は出す（終電のところで読み込めなかったと知らせる）。
       const [live, statuses, prepIds, setlistIds, home] = await Promise.all([
-        getLive(id), getPlaylistStatuses(id), getPrepIds(id), getSetlistIds(id), getHomeStation().catch(() => null),
+        getLive(id), getPlaylistStatuses(id), getPrepIds(id), getSetlistIds(id), getHomeStation().catch(() => undefined),
       ]);
       return { live, statuses, prepIds, setlistIds, home };
     },

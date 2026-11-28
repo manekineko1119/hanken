@@ -73,7 +73,7 @@ create trigger live_photos_limit before insert on public.live_photos
 -- Storage の入れ物（非公開・1MiB・jpeg だけ）
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('live-photos', 'live-photos', false, 1048576, array['image/jpeg'])
-on conflict do nothing;
+on conflict (id) do update set public = false, file_size_limit = 1048576, allowed_mime_types = array['image/jpeg'];
 
 -- storage.objects：自分のフォルダ（<user_id>/...）だけ。update は作らない。
 create policy live_photos_objects_select on storage.objects for select to authenticated

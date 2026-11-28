@@ -45,10 +45,15 @@ export function lastTrainUrl(live, homeStation) {
 // ［終電を調べる］の出し分け。url があればリンク、なければ足りない入れ場所を返す。
 // needVenueStation → 編集の画面、needHome → 設定の画面へのリンクを出す。
 // 日付だけ不正で url が null のときは、駅は足りているのでどちらも false。
+// homeStation が undefined のときは「読み込めなかった」（null・空は「未設定」）。ヒントではなく失敗の知らせを出す。
 export function lastTrainState(live, homeStation) {
+  if (homeStation === undefined) {
+    return { url: null, needVenueStation: false, needHome: false, homeFailed: true };
+  }
   return {
     url: lastTrainUrl(live, homeStation),
     needVenueStation: !normalizeStation(live?.venue_station),
     needHome: !normalizeStation(homeStation),
+    homeFailed: false,
   };
 }
